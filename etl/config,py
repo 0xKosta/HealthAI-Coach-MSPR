@@ -1,0 +1,72 @@
+"""
+Centralized configuration for the ETL pipeline.
+
+Anything you'd want to change in one place lives here:
+    - File paths
+    - Table names (must match init.sql from Role B)
+    - Quality thresholds (used in transform.py)
+    - DB connection string (read from env)
+    - Chunk size for streaming loads
+    - Per-table conflict keys for the upsert path
+"""
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# === Paths ===
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT_DIR / "data"
+RAW_DIR = DATA_DIR / "raw"
+PROCESSED_DIR = DATA_DIR / "processed"
+LOGS_DIR = ROOT_DIR / "logs"
+
+for d in (RAW_DIR, PROCESSED_DIR, LOGS_DIR):
+    d.mkdir(parents=True, exist_ok=True)
+
+# === Source files (placed under data/raw/ — gitignored) ===
+NUTRITION_CSV = RAW_DIR / "daily_food_nutrition_dataset.csv"
+GYM_CSV = RAW_DIR / "gym_members_exercise_tracking.csv"
+EXERCISES_JSON = RAW_DIR / "exercises.json"
+
+# === Database (Supabase Postgres) ===
+# Format: postgresql+psycopg2://postgres.<project-ref>:<password>@<host>:5432/postgres
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# === Table names — MUST match Role B's init.sql ===
+TBL_USERS = "users"
+TBL_FOOD_LOGS = "food_logs"
+TBL_GYM_SESSIONS = "gym_sessions"
+TBL_EXERCISES = "exercises"
+
+# === Streaming ===
+# How many rows per chunk during extract → transform → load.
+# Memory bound ≈ CHUNK_SIZE × num_columns × ~50 bytes. 50k rows ≈ a few MB.
+CHUNK_SIZE = int(os.getenv("ETL_CHUNK_SIZE", "50000"))
+
+# === Per-table conflict keys for UPSERT ===
+# Each list MUST have a matching UNIQUE / PRIMARY KEY constraint in init.sql
+# or ON CONFLICT will fail with "no unique or exclusion constraint matching".
+CONFLICT_KEYS: dict[str, list[str]] = {
+    TBL_USERS:        ["user_id"],
+    TBL_FOOD_LOGS:    ["user_id", "date", "meal_type", "food_item"],
+    TBL_GYM_SESSIONS: ["user_id"],
+    TBL_EXERCISES:    ["id"],
+}
+
+# === Quality thresholds (tweak as you discover the data) ===
+MAX_NULL_RATE = 0.30          # warn if a column has > 30 % NaN
+MIN_AGE, MAX_AGE = 10, 100
+MIN_WEIGHT_KG, MAX_WEIGHT_KG = 30, 250
+MIN_HEIGHT_M, MAX_HEIGHT_M = 1.0, 2.5
+MIN_CALORIES = 0
+MAX_CALORIES_MEAL = 5000
+MAX_CALORIES_SESSION = 3000
+MIN_BPM, MAX_BPM = 30, 250
+
+# === Logging ===
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_FILE = LOGS_DIR / "etl.log"
