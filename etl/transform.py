@@ -77,6 +77,28 @@ def _drop_dups(df, rep, subset=None):
 
 # === USERS (depuis le dataset Gym) ==========================================
 
+def _assign_goal(bmi):
+    """
+    Assigne un objectif santé basé sur le BMI de l'utilisateur.
+    Heuristique métier cohérente — pas une assignation aléatoire :
+      - BMI > 30 (obésité)       → perte de poids
+      - BMI 25-30 (surpoids)     → maintien / perte de poids selon index pair/impair
+      - BMI 18.5-25 (normal)     → maintien ou amélioration du sommeil
+      - BMI < 18.5 (insuffisant) → prise de masse musculaire
+    """
+    if pd.isna(bmi):
+        return "maintenance"
+    if bmi > 30:
+        return "weight_loss"
+    elif bmi > 25:
+        # Légère variation pour diversifier les données
+        return "weight_loss" if int(bmi * 10) % 2 == 0 else "maintenance"
+    elif bmi >= 18.5:
+        return "sleep_improvement" if int(bmi * 10) % 3 == 0 else "maintenance"
+    else:
+        return "muscle_gain"
+
+
 def transform_users(df_gym, id_offset=0):
     rep = QualityReport(source="users", rows_in=len(df_gym))
     df = df_gym.copy()
@@ -106,7 +128,21 @@ def transform_users(df_gym, id_offset=0):
     rename = {"fat_percentage": "body_fat_pct"}
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
 
-    keep = ["name", "age", "gender", "weight_kg", "height_cm", "bmi", "body_fat_pct"]
+    # -------------------------------------------------------------------------
+    # ENRICHISSEMENT : assignation du goal basée sur le BMI
+    # Le dataset Gym Members ne fournit pas d'objectif utilisateur.
+    # On utilise le BMI comme heuristique métier pour simuler des objectifs
+    # réalistes et diversifiés — requis pour les analyses du dashboard.
+    # -------------------------------------------------------------------------
+    if "bmi" in df.columns:
+        df["goal"] = df["bmi"].apply(_assign_goal)
+        rep.notes.append("goal enrichi depuis BMI (absent du dataset source).")
+    else:
+        df["goal"] = "maintenance"
+        rep.notes.append("goal défaut 'maintenance' (BMI absent).")
+
+    keep = ["name", "age", "gender", "weight_kg", "height_cm", "bmi",
+            "body_fat_pct", "goal"]
     out = df[[c for c in keep if c in df.columns]].copy()
 
     out = _drop_dups(out, rep, subset=["name"])
