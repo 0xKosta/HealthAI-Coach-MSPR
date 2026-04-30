@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 EXPECTED_NUTRITION_COLS = {
-    "Date", "User_ID", "Meal_Type", "Food_Item", "Category",
+    "Food_Item", "Category", "Meal_Type",
     "Calories (kcal)", "Protein (g)", "Carbohydrates (g)", "Fat (g)",
     "Fiber (g)", "Sugars (g)", "Sodium (mg)", "Cholesterol (mg)",
     "Water_Intake (ml)",
@@ -23,8 +23,8 @@ EXPECTED_GYM_COLS = {
     "Experience_Level", "BMI",
 }
 EXPECTED_EXERCISE_KEYS = {
-    "id", "name", "bodyPart", "equipment", "target",
-    "secondaryMuscles", "instructions", "gifUrl",
+    "id", "name", "force", "level", "mechanic", "equipment",
+    "primaryMuscles", "secondaryMuscles", "instructions", "category", "images",
 }
 
 
@@ -71,7 +71,6 @@ def extract_exercises() -> pd.DataFrame:
     return df
 
 
-# Lecture par chunks pour borner la mémoire
 def extract_nutrition_chunks(chunksize: int | None = None) -> Iterator[pd.DataFrame]:
     path = config.NUTRITION_CSV
     if not path.exists():

@@ -2,6 +2,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -78,18 +79,23 @@ def _drop_dups(df, rep, subset=None):
     return df
 
 
-def transform_nutrition(df):
+def transform_nutrition(df, id_offset=0):
     rep = QualityReport(source="food_logs", rows_in=len(df))
     df = df.copy()
     df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
 
+    # user_id et date absents du dataset, on les génère
+    df = df.reset_index(drop=True)
+    df["user_id"] = "FOOD_" + (df.index + id_offset + 1).astype(str).str.zfill(8)
+    today = date.today()
+    df["date"] = [today - timedelta(days=int(i)) for i in (df.index + id_offset)]
+    df["date"] = pd.to_datetime(df["date"])
+    rep.notes.append("user_id et date générés (absents du dataset).")
+    rep.coerced_types.append("date -> datetime")
+
     for c in ("meal_type", "food_item", "category"):
         if c in df.columns:
             df[c] = df[c].astype(str).str.strip().str.lower()
-
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        rep.coerced_types.append("date -> datetime")
 
     numeric_cols = [
         "calories_kcal", "protein_g", "carbohydrates_g", "fat_g",
@@ -99,7 +105,7 @@ def transform_nutrition(df):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = _drop_required_nulls(df, ["user_id", "date", "food_item"], rep)
+    df = _drop_required_nulls(df, ["food_item"], rep)
     df = _drop_out_of_range(df, "calories_kcal",
                             config.MIN_CALORIES, config.MAX_CALORIES_MEAL, rep)
     for c in ("protein_g", "carbohydrates_g", "fat_g", "fiber_g", "sugars_g"):
@@ -162,23 +168,26 @@ def transform_exercises(df):
     rename = {
         "id": "id",
         "name": "name",
-        "bodyPart": "body_part",
+        "force": "force",
+        "level": "level",
+        "mechanic": "mechanic",
         "equipment": "equipment",
-        "target": "target_muscle",
+        "primaryMuscles": "primary_muscles",
         "secondaryMuscles": "secondary_muscles",
         "instructions": "instructions",
-        "gifUrl": "gif_url",
+        "category": "category",
+        "images": "images",
     }
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
 
     df = _drop_required_nulls(df, ["id", "name"], rep)
 
-    for c in ("name", "body_part", "equipment", "target_muscle"):
+    for c in ("name", "force", "level", "mechanic", "equipment", "category"):
         if c in df.columns:
             df[c] = df[c].astype(str).str.strip().str.lower()
 
     # Listes JSON aplaties en texte séparé par " | "
-    for c in ("secondary_muscles", "instructions"):
+    for c in ("primary_muscles", "secondary_muscles", "instructions", "images"):
         if c in df.columns:
             df[c] = df[c].apply(
                 lambda v: " | ".join(map(str, v)) if isinstance(v, list)
