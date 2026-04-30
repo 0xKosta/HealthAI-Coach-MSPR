@@ -118,3 +118,4 @@ def test_get_user_not_found_returns_404(client):
     response = client.get("/users/99999")
     assert response.status_code == 404
     assert response.json()["detail"] == "Utilisateur introuvable"
+ 
