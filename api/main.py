@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 
+from api.routers import users, nutrition, exercises, metrics
+
 load_dotenv()
 
 app = FastAPI(
@@ -26,12 +28,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Les routers seront inclus ici une fois les fichiers complétés
-# from api.routers import users, nutrition, exercises, metrics
-# app.include_router(users.router, prefix="/users", tags=["Utilisateurs"])
-# app.include_router(nutrition.router, prefix="/nutrition", tags=["Nutrition"])
-# app.include_router(exercises.router, prefix="/exercises", tags=["Exercices"])
-# app.include_router(metrics.router, prefix="/metrics", tags=["Métriques"])
+app.include_router(users.router,     prefix="/users",     tags=["Utilisateurs"])
+app.include_router(nutrition.router, prefix="/nutrition", tags=["Nutrition"])
+app.include_router(exercises.router, prefix="/exercises", tags=["Exercices"])
+app.include_router(metrics.router,   prefix="/metrics",   tags=["Métriques"])
 
 @app.get("/health", tags=["Santé"], summary="Vérifier l'état de l'API")
 def health_check():
