@@ -1,25 +1,3 @@
-"""
-Transformation & quality layer  —  the part the jury will grill you on.
-
-For each source DataFrame we:
-    1. Standardize column names → snake_case to match the DB schema
-    2. Coerce types (string → numeric, string → datetime)
-    3. Validate ranges and required fields
-    4. Drop duplicates
-    5. Trim / lowercase strings
-    6. Build a QualityReport object summarizing what happened
-
-QualityReport is mergeable — when the pipeline streams chunks, we accumulate
-one report per source by merging chunk-level reports together.
-
-Quality strategy (be ready to defend each line of this):
-    Required-field nulls   → drop row, log
-    Out-of-range numerics  → drop row, log  (we prefer drop > impute → safer claim
-                             of "we don't invent data")
-    Duplicates             → drop, keep first
-    Schema drift           → already logged at extract step
-"""
-
 import logging
 import re
 import unicodedata
@@ -31,8 +9,6 @@ from etl import config
 
 logger = logging.getLogger(__name__)
 
-
-# === Quality report ==========================================================
 
 @dataclass
 class QualityReport:
@@ -46,7 +22,6 @@ class QualityReport:
     notes: list[str] = field(default_factory=list)
 
     def merge(self, other: "QualityReport") -> "QualityReport":
-        """Accumulate a chunk-level report into this one (in place)."""
         self.rows_in += other.rows_in
         self.rows_out += other.rows_out
         self.dropped_required_null += other.dropped_required_null
@@ -62,16 +37,13 @@ class QualityReport:
 
     def summary(self) -> str:
         return (
-            f"[{self.source}] in={self.rows_in} → out={self.rows_out} | "
-            f"dropped: nulls={self.dropped_required_null}, "
-            f"oor={self.dropped_out_of_range}, dups={self.dropped_duplicates}"
+            f"[{self.source}] in={self.rows_in} -> out={self.rows_out} | "
+            f"droppées: nulls={self.dropped_required_null}, "
+            f"hors_borne={self.dropped_out_of_range}, dups={self.dropped_duplicates}"
         )
 
 
-# === Helpers =================================================================
-
 def _to_snake_case(name: str) -> str:
-    """'Calories (kcal)' → 'calories_kcal'."""
     name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     name = re.sub(r"[()/]", " ", name)
     name = re.sub(r"\s+", "_", name.strip())
@@ -79,7 +51,7 @@ def _to_snake_case(name: str) -> str:
     return name.lower()
 
 
-def _drop_required_nulls(df: pd.DataFrame, cols: list[str], rep: QualityReport) -> pd.DataFrame:
+def _drop_required_nulls(df, cols, rep):
     cols = [c for c in cols if c in df.columns]
     if not cols:
         return df
@@ -89,8 +61,7 @@ def _drop_required_nulls(df: pd.DataFrame, cols: list[str], rep: QualityReport) 
     return df
 
 
-def _drop_out_of_range(df: pd.DataFrame, col: str, lo: float, hi: float,
-                       rep: QualityReport) -> pd.DataFrame:
+def _drop_out_of_range(df, col, lo, hi, rep):
     if col not in df.columns:
         return df
     before = len(df)
@@ -100,17 +71,14 @@ def _drop_out_of_range(df: pd.DataFrame, col: str, lo: float, hi: float,
     return df
 
 
-def _drop_dups(df: pd.DataFrame, rep: QualityReport, subset: list[str] | None = None) -> pd.DataFrame:
+def _drop_dups(df, rep, subset=None):
     before = len(df)
     df = df.drop_duplicates(subset=subset)
     rep.dropped_duplicates += before - len(df)
     return df
 
 
-# === Transformers ============================================================
-
-def transform_nutrition(df: pd.DataFrame) -> tuple[pd.DataFrame, QualityReport]:
-    """Daily Food & Nutrition CSV → food_logs table."""
+def transform_nutrition(df):
     rep = QualityReport(source="food_logs", rows_in=len(df))
     df = df.copy()
     df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
@@ -121,7 +89,7 @@ def transform_nutrition(df: pd.DataFrame) -> tuple[pd.DataFrame, QualityReport]:
 
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        rep.coerced_types.append("date → datetime")
+        rep.coerced_types.append("date -> datetime")
 
     numeric_cols = [
         "calories_kcal", "protein_g", "carbohydrates_g", "fat_g",
@@ -144,22 +112,15 @@ def transform_nutrition(df: pd.DataFrame) -> tuple[pd.DataFrame, QualityReport]:
     return df, rep
 
 
-def transform_gym(df: pd.DataFrame, id_offset: int = 0
-                  ) -> tuple[pd.DataFrame, QualityReport]:
-    """Gym Members CSV → gym_sessions table (+ feeds the users table).
-
-    `id_offset` lets the streaming pipeline keep synthesized user_ids unique
-    across chunks (chunk N starts at offset = sum of chunk sizes 0..N-1).
-    """
+def transform_gym(df, id_offset=0):
     rep = QualityReport(source="gym_sessions", rows_in=len(df))
     df = df.copy()
     df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
 
-    # Synthesize user_id (dataset has no native ID). Offset keeps IDs unique
-    # across streamed chunks. Same input file → same IDs → idempotent upserts.
+    # user_id absent du dataset, on le génère
     df = df.reset_index(drop=True)
     df["user_id"] = "GYM_" + (df.index + id_offset + 1).astype(str).str.zfill(8)
-    rep.notes.append("Synthetic user_id generated (dataset has no native ID).")
+    rep.notes.append("user_id généré (absent du dataset).")
 
     for c in ("gender", "workout_type"):
         if c in df.columns:
@@ -177,7 +138,6 @@ def transform_gym(df: pd.DataFrame, id_offset: int = 0
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
     df = _drop_required_nulls(df, ["age", "gender", "weight_kg", "height_m"], rep)
-
     df = _drop_out_of_range(df, "age", config.MIN_AGE, config.MAX_AGE, rep)
     df = _drop_out_of_range(df, "weight_kg",
                             config.MIN_WEIGHT_KG, config.MAX_WEIGHT_KG, rep)
@@ -195,8 +155,7 @@ def transform_gym(df: pd.DataFrame, id_offset: int = 0
     return df, rep
 
 
-def transform_exercises(df: pd.DataFrame) -> tuple[pd.DataFrame, QualityReport]:
-    """ExerciseDB JSON → exercises table."""
+def transform_exercises(df):
     rep = QualityReport(source="exercises", rows_in=len(df))
     df = df.copy()
 
@@ -218,6 +177,7 @@ def transform_exercises(df: pd.DataFrame) -> tuple[pd.DataFrame, QualityReport]:
         if c in df.columns:
             df[c] = df[c].astype(str).str.strip().str.lower()
 
+    # Listes JSON aplaties en texte séparé par " | "
     for c in ("secondary_muscles", "instructions"):
         if c in df.columns:
             df[c] = df[c].apply(
@@ -232,24 +192,20 @@ def transform_exercises(df: pd.DataFrame) -> tuple[pd.DataFrame, QualityReport]:
     return df, rep
 
 
-# === Build users from cleaned gym ============================================
-
 USER_PROFILE_COLS = [
     "user_id", "age", "gender", "weight_kg", "height_m",
     "experience_level", "bmi",
 ]
 
 
-def build_users_from_gym(df_gym: pd.DataFrame) -> pd.DataFrame:
+def build_users_from_gym(df_gym):
     cols = [c for c in USER_PROFILE_COLS if c in df_gym.columns]
     return (df_gym[cols]
             .drop_duplicates(subset=["user_id"])
             .reset_index(drop=True))
 
 
-def split_users_and_sessions(df_gym: pd.DataFrame
-                             ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """From a cleaned gym chunk, return (users, gym_sessions_lean)."""
+def split_users_and_sessions(df_gym):
     df_users = build_users_from_gym(df_gym)
     df_sessions = df_gym.drop(
         columns=[c for c in USER_PROFILE_COLS
