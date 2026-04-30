@@ -36,61 +36,40 @@ def _copy_from_dataframe(conn, df, target):
     return len(df)
 
 
-def _upsert_chunk(conn, df, table, keys):
-    if df.empty:
-        return 0
-
-    staging = f"_stg_{table}"
-    cols = list(df.columns)
-    col_list = ", ".join(f'"{c}"' for c in cols)
-    conflict = ", ".join(f'"{k}"' for k in keys)
-    update_cols = [c for c in cols if c not in keys]
-
-    # Table de staging temporaire
-    conn.execute(text(f"DROP TABLE IF EXISTS {staging};"))
-    conn.execute(text(
-        f"CREATE UNLOGGED TABLE {staging} (LIKE {table} INCLUDING DEFAULTS);"
-    ))
-
-    _copy_from_dataframe(conn, df, staging)
-
-    if update_cols:
-        update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
-        merge_sql = (
-            f"INSERT INTO {table} ({col_list}) "
-            f"SELECT {col_list} FROM {staging} "
-            f"ON CONFLICT ({conflict}) DO UPDATE SET {update_set};"
-        )
-    else:
-        merge_sql = (
-            f"INSERT INTO {table} ({col_list}) "
-            f"SELECT {col_list} FROM {staging} "
-            f"ON CONFLICT ({conflict}) DO NOTHING;"
-        )
-    conn.execute(text(merge_sql))
-    conn.execute(text(f"DROP TABLE {staging};"))
-    return len(df)
+def truncate_all(engine):
+    """Vide toutes les tables ETL avant chargement (idempotence par
+    re-création complète)."""
+    tables = [
+        "session_exercises",
+        "food_logs",
+        "biometric_metrics",
+        "workout_sessions",
+        "exercises",
+        "foods",
+        "users",
+    ]
+    with engine.begin() as conn:
+        for t in tables:
+            conn.execute(text(f"TRUNCATE TABLE {t} RESTART IDENTITY CASCADE;"))
+    logger.info("toutes les tables ETL ont été tronquées.")
 
 
-def upsert(engine, df, table):
-    keys = config.CONFLICT_KEYS.get(table)
-    if not keys:
-        raise ValueError(f"Pas de clés définies pour {table!r}.")
+def insert(engine, df, table):
+    """Insertion simple via COPY. Pas d'upsert : init.sql n'a pas de
+    contraintes UNIQUE, donc la stratégie d'idempotence est TRUNCATE + INSERT."""
     if df.empty:
         logger.warning(f"[{table}] dataframe vide, ignoré.")
         return 0
     with engine.begin() as conn:
-        n = _upsert_chunk(conn, df, table, keys)
-    logger.info(f"[{table}] {n} lignes upsertées.")
+        n = _copy_from_dataframe(conn, df, table)
+    logger.info(f"[{table}] {n} lignes insérées.")
     return n
 
 
-def upsert_stream(engine, table, chunks):
-    total = 0
-    for i, df in enumerate(chunks, 1):
-        if df.empty:
-            continue
-        n = upsert(engine, df, table)
-        total += n
-        logger.debug(f"[{table}] chunk {i}: +{n} (total {total})")
-    return total
+def fetch_id_map(engine, table, key_col):
+    """Retourne un dict {valeur_clé: id} pour résoudre les FK."""
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(f'SELECT id, "{key_col}" FROM {table}')
+        ).all()
+    return {r[1]: r[0] for r in rows}

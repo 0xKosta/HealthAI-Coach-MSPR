@@ -1,6 +1,8 @@
 import logging
 import sys
 
+import pandas as pd
+
 from etl import config, extract, load, transform
 
 
@@ -19,41 +21,132 @@ def setup_logging():
 def run_exercises(engine):
     df = extract.extract_exercises()
     df_clean, rep = transform.transform_exercises(df)
-    load.upsert(engine, df_clean, config.TBL_EXERCISES)
+    load.insert(engine, df_clean, config.TBL_EXERCISES)
     return rep
 
 
-def run_gym(engine):
-    agg = transform.QualityReport(source="gym_sessions")
-    users_total = 0
-    sessions_total = 0
+def run_users_and_workouts(engine):
+    rep_users = transform.QualityReport(source="users")
+    rep_sess = transform.QualityReport(source="workout_sessions")
+    n_users_total = 0
+    n_sess_total = 0
     id_offset = 0
 
     for chunk in extract.extract_gym_chunks():
         rows_in = len(chunk)
-        df_clean, rep = transform.transform_gym(chunk, id_offset=id_offset)
+
+        df_users, ru = transform.transform_users(chunk, id_offset=id_offset)
+        load.insert(engine, df_users, config.TBL_USERS)
+        n_users_total += len(df_users)
+        rep_users.merge(ru)
+
+        df_sess, rs = transform.transform_workout_sessions(chunk, id_offset=id_offset)
+
+        # name -> user_id
+        name_to_id = load.fetch_id_map(engine, config.TBL_USERS, "name")
+        df_sess["user_id"] = df_sess["name"].map(name_to_id)
+        df_sess = df_sess.dropna(subset=["user_id"])
+        df_sess["user_id"] = df_sess["user_id"].astype(int)
+        df_sess = df_sess.drop(columns=["name"])
+
+        load.insert(engine, df_sess, config.TBL_WORKOUT_SESSIONS)
+        n_sess_total += len(df_sess)
+        rep_sess.merge(rs)
+
         id_offset += rows_in
 
-        df_users, df_sessions = transform.split_users_and_sessions(df_clean)
-        users_total += load.upsert(engine, df_users, config.TBL_USERS)
-        sessions_total += load.upsert(engine, df_sessions, config.TBL_GYM_SESSIONS)
-
-        agg.merge(rep)
-
-    return agg, users_total, sessions_total
+    return rep_users, rep_sess, n_users_total, n_sess_total
 
 
-def run_nutrition(engine):
-    agg = transform.QualityReport(source="food_logs")
-    total = 0
+def _ensure_food_users_exist(engine, log):
+    """Crée des users génériques pour matcher les food_logs."""
+    if not config.NUTRITION_CSV.exists():
+        return
+
+    n_nutr = 0
+    for chunk in pd.read_csv(config.NUTRITION_CSV,
+                              chunksize=config.CHUNK_SIZE,
+                              on_bad_lines="warn"):
+        n_nutr += len(chunk)
+
+    name_to_id = load.fetch_id_map(engine, config.TBL_USERS, "name")
+    existing = len(name_to_id)
+    if n_nutr <= existing:
+        return
+
+    rows = [{
+        "name": f"User_{i+1:06d}",
+        "age": 30,
+        "gender": "other",
+        "weight_kg": 70.0,
+        "height_cm": 170.0,
+        "bmi": None,
+        "body_fat_pct": None,
+    } for i in range(existing, n_nutr)]
+
+    df = pd.DataFrame(rows)
+    load.insert(engine, df, config.TBL_USERS)
+    log.info(f"{len(df)} users génériques créés pour les food_logs.")
+
+
+def run_foods_and_logs(engine):
+    rep_foods = transform.QualityReport(source="foods")
+    rep_logs = transform.QualityReport(source="food_logs")
+    n_foods_total = 0
+    n_logs_total = 0
     id_offset = 0
+
+    # Catalogue foods : on accumule sur tous les chunks puis dédup global
+    all_foods = []
+
     for chunk in extract.extract_nutrition_chunks():
         rows_in = len(chunk)
-        df_clean, rep = transform.transform_nutrition(chunk, id_offset=id_offset)
+
+        df_foods, rf = transform.transform_foods(chunk)
+        all_foods.append(df_foods)
+        rep_foods.merge(rf)
+
+        # Food logs (FK résolus plus tard, après que foods soit chargé)
+        df_logs, rl = transform.transform_food_logs(chunk, id_offset=id_offset)
+        rep_logs.merge(rl)
+
+        # On garde df_logs pour après le chargement du catalogue
+        if not hasattr(run_foods_and_logs, "_logs_buffer"):
+            run_foods_and_logs._logs_buffer = []
+        run_foods_and_logs._logs_buffer.append(df_logs)
+
         id_offset += rows_in
-        total += load.upsert(engine, df_clean, config.TBL_FOOD_LOGS)
-        agg.merge(rep)
-    return agg, total
+
+    # Charger le catalogue foods (dédup global)
+    if all_foods:
+        df_foods_all = pd.concat(all_foods, ignore_index=True)
+        before = len(df_foods_all)
+        df_foods_all = df_foods_all.drop_duplicates(subset=["name"])
+        rep_foods.dropped_duplicates += before - len(df_foods_all)
+        load.insert(engine, df_foods_all, config.TBL_FOODS)
+        n_foods_total = len(df_foods_all)
+
+    # Charger les food_logs avec FK résolues
+    name_to_uid = load.fetch_id_map(engine, config.TBL_USERS, "name")
+    food_to_fid = load.fetch_id_map(engine, config.TBL_FOODS, "name")
+
+    for df_logs in getattr(run_foods_and_logs, "_logs_buffer", []):
+        if df_logs.empty:
+            continue
+        df_logs = df_logs.copy()
+        df_logs["user_id"] = df_logs["name"].map(name_to_uid)
+        df_logs["food_id"] = df_logs["food_name"].map(food_to_fid)
+        df_logs = df_logs.dropna(subset=["user_id", "food_id"])
+        df_logs["user_id"] = df_logs["user_id"].astype(int)
+        df_logs["food_id"] = df_logs["food_id"].astype(int)
+        df_logs = df_logs.drop(columns=["name", "food_name"])
+        load.insert(engine, df_logs, config.TBL_FOOD_LOGS)
+        n_logs_total += len(df_logs)
+
+    # Vider le buffer pour les éventuelles ré-exécutions dans le même process
+    run_foods_and_logs._logs_buffer = []
+
+    return rep_foods, rep_logs, n_foods_total, n_logs_total
 
 
 def main():
@@ -65,16 +158,23 @@ def main():
     try:
         engine = load.get_engine()
 
-        ex_rep = run_exercises(engine)
-        log.info(ex_rep.summary())
+        # Idempotence : on repart d'une base vide à chaque run.
+        load.truncate_all(engine)
 
-        gym_rep, n_users, n_sessions = run_gym(engine)
-        log.info(gym_rep.summary())
-        log.info(f"{n_users} users / {n_sessions} gym_sessions chargés")
+        rep_ex = run_exercises(engine)
+        log.info(rep_ex.summary())
 
-        nutr_rep, n_food = run_nutrition(engine)
-        log.info(nutr_rep.summary())
-        log.info(f"{n_food} food_logs chargés")
+        rep_u, rep_s, n_u, n_s = run_users_and_workouts(engine)
+        log.info(rep_u.summary())
+        log.info(rep_s.summary())
+        log.info(f"{n_u} users / {n_s} workout_sessions chargés")
+
+        _ensure_food_users_exist(engine, log)
+
+        rep_f, rep_fl, n_f, n_fl = run_foods_and_logs(engine)
+        log.info(rep_f.summary())
+        log.info(rep_fl.summary())
+        log.info(f"{n_f} foods / {n_fl} food_logs chargés")
 
         log.info("=== Pipeline ETL: OK ===")
         return 0

@@ -19,7 +19,6 @@ class QualityReport:
     dropped_required_null: int = 0
     dropped_out_of_range: int = 0
     dropped_duplicates: int = 0
-    coerced_types: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
     def merge(self, other: "QualityReport") -> "QualityReport":
@@ -28,9 +27,6 @@ class QualityReport:
         self.dropped_required_null += other.dropped_required_null
         self.dropped_out_of_range += other.dropped_out_of_range
         self.dropped_duplicates += other.dropped_duplicates
-        for t in other.coerced_types:
-            if t not in self.coerced_types:
-                self.coerced_types.append(t)
         for n in other.notes:
             if n not in self.notes:
                 self.notes.append(n)
@@ -79,86 +75,93 @@ def _drop_dups(df, rep, subset=None):
     return df
 
 
-def transform_nutrition(df, id_offset=0):
-    rep = QualityReport(source="food_logs", rows_in=len(df))
-    df = df.copy()
+# === USERS (depuis le dataset Gym) ==========================================
+
+def transform_users(df_gym, id_offset=0):
+    rep = QualityReport(source="users", rows_in=len(df_gym))
+    df = df_gym.copy()
     df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
 
-    # user_id et date absents du dataset, on les génère
     df = df.reset_index(drop=True)
-    df["user_id"] = "FOOD_" + (df.index + id_offset + 1).astype(str).str.zfill(8)
-    today = date.today()
-    df["date"] = [today - timedelta(days=int(i)) for i in (df.index + id_offset)]
-    df["date"] = pd.to_datetime(df["date"])
-    rep.notes.append("user_id et date générés (absents du dataset).")
-    rep.coerced_types.append("date -> datetime")
+    df["name"] = "User_" + (df.index + id_offset + 1).astype(str).str.zfill(6)
+    rep.notes.append("name généré (absent du dataset).")
 
-    for c in ("meal_type", "food_item", "category"):
-        if c in df.columns:
-            df[c] = df[c].astype(str).str.strip().str.lower()
+    if "gender" in df.columns:
+        df["gender"] = df["gender"].astype(str).str.strip().str.lower()
 
-    numeric_cols = [
-        "calories_kcal", "protein_g", "carbohydrates_g", "fat_g",
-        "fiber_g", "sugars_g", "sodium_mg", "cholesterol_mg", "water_intake_ml",
-    ]
-    for c in numeric_cols:
+    for c in ("age", "weight_kg", "height_m", "bmi", "fat_percentage"):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    df = _drop_required_nulls(df, ["food_item"], rep)
-    df = _drop_out_of_range(df, "calories_kcal",
-                            config.MIN_CALORIES, config.MAX_CALORIES_MEAL, rep)
-    for c in ("protein_g", "carbohydrates_g", "fat_g", "fiber_g", "sugars_g"):
-        df = _drop_out_of_range(df, c, 0, 1000, rep)
-
-    df = _drop_dups(df, rep, subset=["user_id", "date", "meal_type", "food_item"])
-
-    rep.rows_out = len(df)
-    logger.info(rep.summary())
-    return df, rep
-
-
-def transform_gym(df, id_offset=0):
-    rep = QualityReport(source="gym_sessions", rows_in=len(df))
-    df = df.copy()
-    df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
-
-    # user_id absent du dataset, on le génère
-    df = df.reset_index(drop=True)
-    df["user_id"] = "GYM_" + (df.index + id_offset + 1).astype(str).str.zfill(8)
-    rep.notes.append("user_id généré (absent du dataset).")
-
-    for c in ("gender", "workout_type"):
-        if c in df.columns:
-            df[c] = df[c].astype(str).str.strip().str.lower()
-
-    numeric_cols = [
-        "age", "weight_kg", "height_m",
-        "max_bpm", "avg_bpm", "resting_bpm",
-        "session_duration_hours", "calories_burned", "fat_percentage",
-        "water_intake_liters", "workout_frequency_days_week",
-        "experience_level", "bmi",
-    ]
-    for c in numeric_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    df = _drop_required_nulls(df, ["age", "gender", "weight_kg", "height_m"], rep)
+    df = _drop_required_nulls(df, ["age", "weight_kg", "height_m"], rep)
     df = _drop_out_of_range(df, "age", config.MIN_AGE, config.MAX_AGE, rep)
     df = _drop_out_of_range(df, "weight_kg",
                             config.MIN_WEIGHT_KG, config.MAX_WEIGHT_KG, rep)
     df = _drop_out_of_range(df, "height_m",
                             config.MIN_HEIGHT_M, config.MAX_HEIGHT_M, rep)
+
+    if "height_m" in df.columns:
+        df["height_cm"] = df["height_m"] * 100
+
+    rename = {"fat_percentage": "body_fat_pct"}
+    df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+
+    keep = ["name", "age", "gender", "weight_kg", "height_cm", "bmi", "body_fat_pct"]
+    out = df[[c for c in keep if c in df.columns]].copy()
+
+    out = _drop_dups(out, rep, subset=["name"])
+    rep.rows_out = len(out)
+    logger.info(rep.summary())
+    return out, rep
+
+
+# === WORKOUT_SESSIONS (depuis le dataset Gym, même CSV que users) ===========
+
+def transform_workout_sessions(df_gym, id_offset=0):
+    rep = QualityReport(source="workout_sessions", rows_in=len(df_gym))
+    df = df_gym.copy()
+    df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
+
+    df = df.reset_index(drop=True)
+    df["name"] = "User_" + (df.index + id_offset + 1).astype(str).str.zfill(6)
+
+    # session_date généré (absent du dataset) : un jour par ligne en remontant
+    today = date.today()
+    df["session_date"] = [today - timedelta(days=int(i))
+                          for i in (df.index + id_offset)]
+    df["session_date"] = pd.to_datetime(df["session_date"])
+    rep.notes.append("session_date générée (absente du dataset).")
+
+    for c in ("session_duration_hours", "calories_burned", "avg_bpm", "max_bpm"):
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
     df = _drop_out_of_range(df, "calories_burned",
                             0, config.MAX_CALORIES_SESSION, rep)
-    for c in ("max_bpm", "avg_bpm", "resting_bpm"):
+    for c in ("avg_bpm", "max_bpm"):
         df = _drop_out_of_range(df, c, config.MIN_BPM, config.MAX_BPM, rep)
 
-    df = _drop_dups(df, rep)
+    if "session_duration_hours" in df.columns:
+        df["duration_min"] = (df["session_duration_hours"] * 60).round().astype("Int64")
 
-    rep.rows_out = len(df)
+    keep = ["name", "session_date", "duration_min",
+            "calories_burned", "avg_bpm", "max_bpm"]
+    out = df[[c for c in keep if c in df.columns]].copy()
+
+    out = _drop_dups(out, rep, subset=["name", "session_date"])
+    rep.rows_out = len(out)
     logger.info(rep.summary())
-    return df, rep
+    return out, rep
+
+
+# === EXERCISES (depuis ExerciseDB JSON) =====================================
+
+_LEVEL_MAP = {
+    "beginner": "beginner",
+    "intermediate": "intermediate",
+    "expert": "expert",
+    "advanced": "expert",
+}
 
 
 def transform_exercises(df):
@@ -166,58 +169,138 @@ def transform_exercises(df):
     df = df.copy()
 
     rename = {
-        "id": "id",
         "name": "name",
-        "force": "force",
-        "level": "level",
-        "mechanic": "mechanic",
+        "category": "type",
         "equipment": "equipment",
-        "primaryMuscles": "primary_muscles",
-        "secondaryMuscles": "secondary_muscles",
+        "level": "level",
         "instructions": "instructions",
-        "category": "category",
-        "images": "images",
     }
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
 
-    df = _drop_required_nulls(df, ["id", "name"], rep)
+    df = _drop_required_nulls(df, ["name"], rep)
 
-    for c in ("name", "force", "level", "mechanic", "equipment", "category"):
+    for c in ("name", "type", "equipment"):
         if c in df.columns:
             df[c] = df[c].astype(str).str.strip().str.lower()
 
-    # Listes JSON aplaties en texte séparé par " | "
-    for c in ("primary_muscles", "secondary_muscles", "instructions", "images"):
-        if c in df.columns:
-            df[c] = df[c].apply(
-                lambda v: " | ".join(map(str, v)) if isinstance(v, list)
-                else (str(v) if pd.notna(v) else "")
-            )
+    if "level" in df.columns:
+        df["level"] = (df["level"].astype(str).str.strip().str.lower()
+                       .map(_LEVEL_MAP))
 
-    df = _drop_dups(df, rep, subset=["id"])
+    if "primaryMuscles" in df.columns:
+        df["muscle_group"] = df["primaryMuscles"].apply(
+            lambda v: (v[0] if isinstance(v, list) and v else
+                       (str(v) if pd.notna(v) else None))
+        )
+        if df["muscle_group"].notna().any():
+            df["muscle_group"] = df["muscle_group"].astype(str).str.strip().str.lower()
 
-    rep.rows_out = len(df)
+    if "instructions" in df.columns:
+        df["instructions"] = df["instructions"].apply(
+            lambda v: " | ".join(map(str, v)) if isinstance(v, list)
+            else (str(v) if pd.notna(v) else "")
+        )
+
+    keep = ["name", "type", "muscle_group", "equipment", "level", "instructions"]
+    out = df[[c for c in keep if c in df.columns]].copy()
+
+    out = _drop_dups(out, rep, subset=["name"])
+    rep.rows_out = len(out)
     logger.info(rep.summary())
-    return df, rep
+    return out, rep
 
 
-USER_PROFILE_COLS = [
-    "user_id", "age", "gender", "weight_kg", "height_m",
-    "experience_level", "bmi",
-]
+# === FOODS (catalogue dédupliqué depuis Nutrition CSV) ======================
+
+def transform_foods(df_nutr):
+    rep = QualityReport(source="foods", rows_in=len(df_nutr))
+    df = df_nutr.copy()
+    df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
+
+    df = _drop_required_nulls(df, ["food_item"], rep)
+
+    for c in ("food_item", "category"):
+        if c in df.columns:
+            df[c] = df[c].astype(str).str.strip().str.lower()
+
+    numeric_map = {
+        "calories_kcal": "calories_per_100g",
+        "protein_g": "proteins_g",
+        "carbohydrates_g": "carbs_g",
+        "fat_g": "fats_g",
+        "fiber_g": "fiber_g",
+    }
+    for src, dst in numeric_map.items():
+        if src in df.columns:
+            df[dst] = pd.to_numeric(df[src], errors="coerce")
+
+    df = df.rename(columns={"food_item": "name"})
+
+    df = _drop_out_of_range(df, "calories_per_100g",
+                            config.MIN_CALORIES, config.MAX_CALORIES_MEAL, rep)
+    for c in ("proteins_g", "carbs_g", "fats_g", "fiber_g"):
+        df = _drop_out_of_range(df, c, 0, 1000, rep)
+
+    df = _drop_required_nulls(df, ["name", "calories_per_100g"], rep)
+
+    keep = ["name", "category", "calories_per_100g",
+            "proteins_g", "carbs_g", "fats_g", "fiber_g"]
+    out = df[[c for c in keep if c in df.columns]].copy()
+
+    # Dédup : on garde la première occurrence pour chaque aliment
+    out = _drop_dups(out, rep, subset=["name"])
+    rep.rows_out = len(out)
+    logger.info(rep.summary())
+    return out, rep
 
 
-def build_users_from_gym(df_gym):
-    cols = [c for c in USER_PROFILE_COLS if c in df_gym.columns]
-    return (df_gym[cols]
-            .drop_duplicates(subset=["user_id"])
-            .reset_index(drop=True))
+# === FOOD_LOGS (lignes de log nutrition; FK résolus dans pipeline.py) ======
+
+_VALID_MEALS = {"breakfast", "lunch", "dinner", "snack"}
 
 
-def split_users_and_sessions(df_gym):
-    df_users = build_users_from_gym(df_gym)
-    df_sessions = df_gym.drop(
-        columns=[c for c in USER_PROFILE_COLS
-                 if c in df_gym.columns and c != "user_id"]
-    )
-    return df_users, df_sessions
+def transform_food_logs(df_nutr, id_offset=0):
+    rep = QualityReport(source="food_logs", rows_in=len(df_nutr))
+    df = df_nutr.copy()
+    df = df.rename(columns={c: _to_snake_case(c) for c in df.columns})
+
+    df = df.reset_index(drop=True)
+    df["name"] = "User_" + (df.index + id_offset + 1).astype(str).str.zfill(6)
+
+    today = date.today()
+    df["log_date"] = [today - timedelta(days=int(i))
+                      for i in (df.index + id_offset)]
+    df["log_date"] = pd.to_datetime(df["log_date"])
+    rep.notes.append("name et log_date générés (absents du dataset).")
+
+    for c in ("food_item", "meal_type"):
+        if c in df.columns:
+            df[c] = df[c].astype(str).str.strip().str.lower()
+
+    if "meal_type" in df.columns:
+        df["meal_type"] = df["meal_type"].where(
+            df["meal_type"].isin(_VALID_MEALS), other=pd.NA
+        )
+
+    df = df.rename(columns={"food_item": "food_name"})
+
+    if "calories_kcal" in df.columns:
+        df["calories_consumed"] = pd.to_numeric(df["calories_kcal"], errors="coerce")
+
+    # Le dataset n'a pas de quantité ; on normalise à 100g par ligne et
+    # calories_consumed = Calories (kcal) tel que fourni.
+    df["quantity_g"] = 100.0
+
+    df = _drop_required_nulls(df, ["food_name", "meal_type"], rep)
+    df = _drop_out_of_range(df, "calories_consumed",
+                            config.MIN_CALORIES, config.MAX_CALORIES_MEAL, rep)
+
+    keep = ["name", "food_name", "log_date", "meal_type",
+            "quantity_g", "calories_consumed"]
+    out = df[[c for c in keep if c in df.columns]].copy()
+
+    out = _drop_dups(out, rep,
+                     subset=["name", "food_name", "log_date", "meal_type"])
+    rep.rows_out = len(out)
+    logger.info(rep.summary())
+    return out, rep

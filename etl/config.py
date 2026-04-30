@@ -20,21 +20,13 @@ EXERCISES_JSON = RAW_DIR / "exercises.json"
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Doivent correspondre à init.sql
 TBL_USERS = "users"
-TBL_FOOD_LOGS = "food_logs"
-TBL_GYM_SESSIONS = "gym_sessions"
+TBL_FOODS = "foods"
 TBL_EXERCISES = "exercises"
+TBL_FOOD_LOGS = "food_logs"
+TBL_WORKOUT_SESSIONS = "workout_sessions"
 
 CHUNK_SIZE = int(os.getenv("ETL_CHUNK_SIZE", "50000"))
-
-# Clés utilisées par ON CONFLICT lors de l'upsert
-CONFLICT_KEYS: dict[str, list[str]] = {
-    TBL_USERS:        ["user_id"],
-    TBL_FOOD_LOGS:    ["user_id", "date", "meal_type", "food_item"],
-    TBL_GYM_SESSIONS: ["user_id"],
-    TBL_EXERCISES:    ["id"],
-}
 
 MAX_NULL_RATE = 0.30
 MIN_AGE, MAX_AGE = 10, 100
