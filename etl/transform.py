@@ -237,7 +237,7 @@ def transform_exercises(df):
             else (str(v) if pd.notna(v) else "")
         )
 
-    keep = ["name", "type", "muscle_group", "equipment", "level", "instructions"]
+    keep = ["name", "type", "muscle_group", "equipment", "level", "instructions", "gif_url", "video_url", "image_url"]
     out = df[[c for c in keep if c in df.columns]].copy()
 
     out = _drop_dups(out, rep, subset=["name"])
