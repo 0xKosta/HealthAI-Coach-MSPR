@@ -38,6 +38,7 @@ jobs:
 
       - name: Download datasets
         run: |
+          set -e
           mkdir -p data/raw
 
           # ExerciseDB JSON (public GitHub)
@@ -50,16 +51,28 @@ jobs:
           kaggle datasets download -d valakhorasani/gym-members-exercise-dataset \
             -p data/raw/ --unzip
 
-          # Normaliser les noms attendus par le pipeline
+          # Renommer aux noms attendus si nécessaire (idempotent)
           cd data/raw
-          for f in *.csv; do
-            case "$f" in
-              *food*nutrition*|*nutrition*food*|daily_food*)
-                mv -n "$f" daily_food_nutrition_dataset.csv ;;
-              *gym*members*|*members*gym*|gym_members*)
-                mv -n "$f" gym_members_exercise_tracking.csv ;;
-            esac
-          done
+
+          rename_to() {
+            local target="$1"; shift
+            [ -f "$target" ] && return 0
+            for src in "$@"; do
+              if [ -f "$src" ]; then
+                mv "$src" "$target"
+                return 0
+              fi
+            done
+          }
+
+          rename_to daily_food_nutrition_dataset.csv \
+            "daily_food_and_nutrition_dataset.csv" \
+            "daily_food_nutrition.csv"
+
+          rename_to gym_members_exercise_tracking.csv \
+            "gym_members_exercise_dataset.csv" \
+            "gym_members.csv"
+
           ls -la
 
       - name: Run ETL
