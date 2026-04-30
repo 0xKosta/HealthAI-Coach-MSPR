@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from api.database import Base, get_db
 from api.main import app
@@ -26,6 +27,7 @@ engine = create_engine(
     SQLITE_URL,
     # check_same_thread=False requis par SQLite en contexte multi-thread (TestClient)
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
