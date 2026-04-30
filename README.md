@@ -49,7 +49,7 @@ pip install -r requirements.txt
 ### 4. Configurer les variables d'environnement
 
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
 Ouvrir `.env` et renseigner les valeurs :
