@@ -85,12 +85,18 @@ CREATE TABLE exercises (
     muscle_group    VARCHAR(100),   -- chest, back, legs, shoulders, core...
     equipment       VARCHAR(100),   -- barbell, dumbbell, bodyweight, cable...
     level           VARCHAR(50)     CHECK (level IN ('beginner', 'intermediate', 'expert')),
-    instructions    TEXT
+    instructions    TEXT,
+    gif_url         TEXT,           -- animation GIF du mouvement
+    video_url       TEXT,           -- lien vidéo YouTube
+    image_url       TEXT            -- image statique / thumbnail
 );
 
 COMMENT ON TABLE  exercises              IS 'Catalogue d''exercices — source : ExerciseDB (GitHub, format JSON)';
 COMMENT ON COLUMN exercises.muscle_group IS 'Groupe musculaire principal ciblé';
 COMMENT ON COLUMN exercises.level        IS 'Niveau de difficulté : beginner, intermediate, expert';
+COMMENT ON COLUMN exercises.gif_url      IS 'URL du GIF animé illustrant le mouvement';
+COMMENT ON COLUMN exercises.video_url    IS 'Lien vidéo YouTube de démonstration';
+COMMENT ON COLUMN exercises.image_url    IS 'URL de l''image statique / thumbnail';
 
 
 -- =============================================================================
