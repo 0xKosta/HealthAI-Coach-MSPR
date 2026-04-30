@@ -75,6 +75,9 @@ class ExerciseCreate(BaseModel):
     equipment: Optional[str] = Field(None, max_length=100, description="barbell, dumbbell, bodyweight, cable...")
     level: Optional[Literal["beginner", "intermediate", "expert"]] = None
     instructions: Optional[str] = None
+    gif_url:   Optional[str] = None
+    video_url: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class ExerciseResponse(ExerciseCreate):

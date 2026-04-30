@@ -93,6 +93,9 @@ class Exercise(Base):
     equipment    = Column(String(100))              # barbell, dumbbell, bodyweight, cable...
     level        = Column(String(50))               # beginner, intermediate, expert
     instructions = Column(Text)
+    gif_url      = Column(Text)
+    video_url    = Column(Text)
+    image_url    = Column(Text)
 
     __table_args__ = (
         CheckConstraint(
