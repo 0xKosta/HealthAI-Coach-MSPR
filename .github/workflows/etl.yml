@@ -18,6 +18,8 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
       LOG_LEVEL: INFO
 
     steps:
@@ -28,11 +30,53 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - run: |
+      - name: Install deps
+        run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install kaggle
 
-      - run: python -m etl.pipeline
+      - name: Download datasets
+        run: |
+          set -e
+          mkdir -p data/raw
+
+          # ExerciseDB JSON (public GitHub)
+          curl -L -o data/raw/exercises.json \
+            https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json
+
+          # Kaggle datasets
+          kaggle datasets download -d adilshamim8/daily-food-and-nutrition-dataset \
+            -p data/raw/ --unzip
+          kaggle datasets download -d valakhorasani/gym-members-exercise-dataset \
+            -p data/raw/ --unzip
+
+          # Renommer aux noms attendus si nécessaire (idempotent)
+          cd data/raw
+
+          rename_to() {
+            local target="$1"; shift
+            [ -f "$target" ] && return 0
+            for src in "$@"; do
+              if [ -f "$src" ]; then
+                mv "$src" "$target"
+                return 0
+              fi
+            done
+          }
+
+          rename_to daily_food_nutrition_dataset.csv \
+            "daily_food_and_nutrition_dataset.csv" \
+            "daily_food_nutrition.csv"
+
+          rename_to gym_members_exercise_tracking.csv \
+            "gym_members_exercise_dataset.csv" \
+            "gym_members.csv"
+
+          ls -la
+
+      - name: Run ETL
+        run: python -m etl.pipeline
 
       - if: failure()
         uses: actions/upload-artifact@v4

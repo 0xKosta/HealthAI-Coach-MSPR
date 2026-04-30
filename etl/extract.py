@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 EXPECTED_NUTRITION_COLS = {
-    "Date", "User_ID", "Meal_Type", "Food_Item", "Category",
+    "Food_Item", "Category", "Meal_Type",
     "Calories (kcal)", "Protein (g)", "Carbohydrates (g)", "Fat (g)",
     "Fiber (g)", "Sugars (g)", "Sodium (mg)", "Cholesterol (mg)",
     "Water_Intake (ml)",
@@ -23,8 +23,8 @@ EXPECTED_GYM_COLS = {
     "Experience_Level", "BMI",
 }
 EXPECTED_EXERCISE_KEYS = {
-    "id", "name", "bodyPart", "equipment", "target",
-    "secondaryMuscles", "instructions", "gifUrl",
+    "id", "name", "force", "level", "mechanic", "equipment",
+    "primaryMuscles", "secondaryMuscles", "instructions", "category", "images",
 }
 
 
@@ -41,7 +41,7 @@ def extract_nutrition() -> pd.DataFrame:
     path = config.NUTRITION_CSV
     if not path.exists():
         raise FileNotFoundError(f"CSV nutrition introuvable: {path}")
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, on_bad_lines="warn")
     logger.info(f"[nutrition] {len(df)} lignes lues")
     _check_schema(set(df.columns), EXPECTED_NUTRITION_COLS, "nutrition")
     return df
@@ -51,7 +51,7 @@ def extract_gym() -> pd.DataFrame:
     path = config.GYM_CSV
     if not path.exists():
         raise FileNotFoundError(f"CSV gym introuvable: {path}")
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, on_bad_lines="warn")
     logger.info(f"[gym] {len(df)} lignes lues")
     _check_schema(set(df.columns), EXPECTED_GYM_COLS, "gym")
     return df
@@ -71,7 +71,6 @@ def extract_exercises() -> pd.DataFrame:
     return df
 
 
-# Lecture par chunks pour borner la mémoire
 def extract_nutrition_chunks(chunksize: int | None = None) -> Iterator[pd.DataFrame]:
     path = config.NUTRITION_CSV
     if not path.exists():
@@ -79,7 +78,7 @@ def extract_nutrition_chunks(chunksize: int | None = None) -> Iterator[pd.DataFr
     chunksize = chunksize or config.CHUNK_SIZE
     total = 0
     schema_checked = False
-    for chunk in pd.read_csv(path, chunksize=chunksize):
+    for chunk in pd.read_csv(path, chunksize=chunksize, on_bad_lines="warn"):
         if not schema_checked:
             _check_schema(set(chunk.columns), EXPECTED_NUTRITION_COLS, "nutrition")
             schema_checked = True
@@ -95,7 +94,7 @@ def extract_gym_chunks(chunksize: int | None = None) -> Iterator[pd.DataFrame]:
     chunksize = chunksize or config.CHUNK_SIZE
     total = 0
     schema_checked = False
-    for chunk in pd.read_csv(path, chunksize=chunksize):
+    for chunk in pd.read_csv(path, chunksize=chunksize, on_bad_lines="warn"):
         if not schema_checked:
             _check_schema(set(chunk.columns), EXPECTED_GYM_COLS, "gym")
             schema_checked = True

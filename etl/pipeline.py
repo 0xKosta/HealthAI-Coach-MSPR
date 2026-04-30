@@ -46,8 +46,11 @@ def run_gym(engine):
 def run_nutrition(engine):
     agg = transform.QualityReport(source="food_logs")
     total = 0
+    id_offset = 0
     for chunk in extract.extract_nutrition_chunks():
-        df_clean, rep = transform.transform_nutrition(chunk)
+        rows_in = len(chunk)
+        df_clean, rep = transform.transform_nutrition(chunk, id_offset=id_offset)
+        id_offset += rows_in
         total += load.upsert(engine, df_clean, config.TBL_FOOD_LOGS)
         agg.merge(rep)
     return agg, total
