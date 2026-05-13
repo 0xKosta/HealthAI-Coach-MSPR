@@ -25,17 +25,22 @@ TBL_FOODS = "foods"
 TBL_EXERCISES = "exercises"
 TBL_FOOD_LOGS = "food_logs"
 TBL_WORKOUT_SESSIONS = "workout_sessions"
+TBL_SESSION_EXERCISES = "session_exercises"
+TBL_BIOMETRIC_METRICS = "biometric_metrics"
 
 CHUNK_SIZE = int(os.getenv("ETL_CHUNK_SIZE", "50000"))
 
-# Base URL des images d'exercices (chemins relatifs dans le JSON ExerciseDB)
 EXERCISE_IMAGE_BASE_URL = (
     "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/"
 )
-# Base URL d'une recherche YouTube (le dataset ne contient pas de vidéos)
 EXERCISE_VIDEO_SEARCH_BASE_URL = (
     "https://www.youtube.com/results?search_query="
 )
+
+# Simulation : nombre d'exercices par session et historique biométrique
+SIM_EXERCISES_PER_SESSION_MIN = 3
+SIM_EXERCISES_PER_SESSION_MAX = 5
+SIM_BIOMETRIC_DAYS = 30
 
 MAX_NULL_RATE = 0.30
 MIN_AGE, MAX_AGE = 10, 100
