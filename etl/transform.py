@@ -1,6 +1,7 @@
 import logging
 import re
 import unicodedata
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -200,9 +201,51 @@ _LEVEL_MAP = {
 }
 
 
+def _build_image_url(images_value):
+    """images est une liste de chemins relatifs ; on prend le premier."""
+    if not isinstance(images_value, list) or not images_value:
+        return None
+    rel = str(images_value[0]).lstrip("/")
+    return config.EXERCISE_IMAGE_BASE_URL + rel
+
+
+def _build_gif_url(images_value):
+    """Le dataset ne contient pas de GIF, on retombe sur la deuxième image si
+    elle existe (vue alternative), sinon NULL."""
+    if not isinstance(images_value, list) or len(images_value) < 2:
+        return None
+    rel = str(images_value[1]).lstrip("/")
+    return config.EXERCISE_IMAGE_BASE_URL + rel
+
+
+def _build_video_url(name):
+    """Le dataset ne contient pas de vidéos. On synthétise une URL de
+    recherche YouTube basée sur le nom de l'exercice."""
+    if not isinstance(name, str) or not name.strip():
+        return None
+    q = urllib.parse.quote_plus(f"{name} exercise tutorial")
+    return config.EXERCISE_VIDEO_SEARCH_BASE_URL + q
+
+
 def transform_exercises(df):
     rep = QualityReport(source="exercises", rows_in=len(df))
     df = df.copy()
+
+    # Médias construits AVANT le rename, parce que la colonne source "name"
+    # va servir aux URLs vidéo et "images" aux URLs image/gif.
+    if "images" in df.columns:
+        df["image_url"] = df["images"].apply(_build_image_url)
+        df["gif_url"] = df["images"].apply(_build_gif_url)
+        rep.notes.append("image_url et gif_url construits depuis 'images'.")
+    else:
+        df["image_url"] = None
+        df["gif_url"] = None
+
+    if "name" in df.columns:
+        df["video_url"] = df["name"].apply(_build_video_url)
+        rep.notes.append("video_url synthétisé (recherche YouTube par nom).")
+    else:
+        df["video_url"] = None
 
     rename = {
         "name": "name",
@@ -237,7 +280,8 @@ def transform_exercises(df):
             else (str(v) if pd.notna(v) else "")
         )
 
-    keep = ["name", "type", "muscle_group", "equipment", "level", "instructions", "gif_url", "video_url", "image_url"]
+    keep = ["name", "type", "muscle_group", "equipment", "level", "instructions",
+            "gif_url", "video_url", "image_url"]
     out = df[[c for c in keep if c in df.columns]].copy()
 
     out = _drop_dups(out, rep, subset=["name"])

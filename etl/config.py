@@ -28,6 +28,15 @@ TBL_WORKOUT_SESSIONS = "workout_sessions"
 
 CHUNK_SIZE = int(os.getenv("ETL_CHUNK_SIZE", "50000"))
 
+# Base URL des images d'exercices (chemins relatifs dans le JSON ExerciseDB)
+EXERCISE_IMAGE_BASE_URL = (
+    "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/"
+)
+# Base URL d'une recherche YouTube (le dataset ne contient pas de vidéos)
+EXERCISE_VIDEO_SEARCH_BASE_URL = (
+    "https://www.youtube.com/results?search_query="
+)
+
 MAX_NULL_RATE = 0.30
 MIN_AGE, MAX_AGE = 10, 100
 MIN_WEIGHT_KG, MAX_WEIGHT_KG = 30, 250
