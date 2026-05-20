@@ -1,13 +1,12 @@
-# api/models.py
 # Modèles SQLAlchemy — générés à partir de db/init.sql (Rôle B)
 # Ordre : tables sans FK d'abord, puis tables dépendantes, puis table de liaison
 
-from sqlalchemy import (
-    Column, Integer, Float, String, Text, Date, CheckConstraint,
-    ForeignKey
-)
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from __future__ import annotations
+
+from datetime import date
+
+from sqlalchemy import CheckConstraint, Date, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.database import Base
 
@@ -20,16 +19,16 @@ from api.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id           = Column(Integer, primary_key=True)
-    name         = Column(String(100), nullable=False)
-    age          = Column(Integer, nullable=False)
-    gender       = Column(String(10))
-    weight_kg    = Column(Float)
-    height_cm    = Column(Float)
-    bmi          = Column(Float)                    # Calculé à l'ingestion par le pipeline ETL
-    body_fat_pct = Column(Float)
-    goal         = Column(String(50))
-    created_at   = Column(Date, nullable=False, server_default=func.current_date())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    gender: Mapped[str | None] = mapped_column(String(10))
+    weight_kg: Mapped[float | None] = mapped_column(Float)
+    height_cm: Mapped[float | None] = mapped_column(Float)
+    bmi: Mapped[float | None] = mapped_column(Float)  # Calculé à l'ingestion par le pipeline ETL
+    body_fat_pct: Mapped[float | None] = mapped_column(Float)
+    goal: Mapped[str | None] = mapped_column(String(50))
+    created_at: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
 
     __table_args__ = (
         CheckConstraint("age >= 0 AND age <= 120",              name="ck_users_age"),
@@ -44,9 +43,9 @@ class User(Base):
     )
 
     # Relations
-    food_logs         = relationship("FoodLog",         back_populates="user", cascade="all, delete-orphan")
-    workout_sessions  = relationship("WorkoutSession",  back_populates="user", cascade="all, delete-orphan")
-    biometric_metrics = relationship("BiometricMetric", back_populates="user", cascade="all, delete-orphan")
+    food_logs: Mapped[list[FoodLog]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    workout_sessions: Mapped[list[WorkoutSession]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    biometric_metrics: Mapped[list[BiometricMetric]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 # =============================================================================
@@ -57,14 +56,14 @@ class User(Base):
 class Food(Base):
     __tablename__ = "foods"
 
-    id                = Column(Integer, primary_key=True)
-    name              = Column(String(200), nullable=False)
-    category          = Column(String(100))         # ex : fruits, légumes, viandes, céréales...
-    calories_per_100g = Column(Float, nullable=False)  # Valeur calorique pour 100g de produit
-    proteins_g        = Column(Float)
-    carbs_g           = Column(Float)
-    fats_g            = Column(Float)
-    fiber_g           = Column(Float)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100))  # ex : fruits, légumes, viandes, céréales...
+    calories_per_100g: Mapped[float] = mapped_column(Float, nullable=False)  # Valeur calorique pour 100g de produit
+    proteins_g: Mapped[float | None] = mapped_column(Float)
+    carbs_g: Mapped[float | None] = mapped_column(Float)
+    fats_g: Mapped[float | None] = mapped_column(Float)
+    fiber_g: Mapped[float | None] = mapped_column(Float)
 
     __table_args__ = (
         CheckConstraint("calories_per_100g >= 0", name="ck_foods_calories_per_100g"),
@@ -75,7 +74,7 @@ class Food(Base):
     )
 
     # Relations
-    food_logs = relationship("FoodLog", back_populates="food")
+    food_logs: Mapped[list[FoodLog]] = relationship(back_populates="food")
 
 
 # =============================================================================
@@ -86,16 +85,16 @@ class Food(Base):
 class Exercise(Base):
     __tablename__ = "exercises"
 
-    id           = Column(Integer, primary_key=True)
-    name         = Column(String(200), nullable=False)
-    type         = Column(String(100))              # cardio, strength, flexibility, balance...
-    muscle_group = Column(String(100))              # Groupe musculaire principal ciblé
-    equipment    = Column(String(100))              # barbell, dumbbell, bodyweight, cable...
-    level        = Column(String(50))               # beginner, intermediate, expert
-    instructions = Column(Text)
-    gif_url      = Column(Text)
-    video_url    = Column(Text)
-    image_url    = Column(Text)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    type: Mapped[str | None] = mapped_column(String(100))  # cardio, strength, flexibility, balance...
+    muscle_group: Mapped[str | None] = mapped_column(String(100))  # Groupe musculaire principal ciblé
+    equipment: Mapped[str | None] = mapped_column(String(100))  # barbell, dumbbell, bodyweight, cable...
+    level: Mapped[str | None] = mapped_column(String(50))  # beginner, intermediate, expert
+    instructions: Mapped[str | None] = mapped_column(Text)
+    gif_url: Mapped[str | None] = mapped_column(Text)
+    video_url: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         CheckConstraint(
@@ -105,7 +104,7 @@ class Exercise(Base):
     )
 
     # Relations
-    session_exercises = relationship("SessionExercise", back_populates="exercise")
+    session_exercises: Mapped[list[SessionExercise]] = relationship(back_populates="exercise")
 
 
 # =============================================================================
@@ -116,13 +115,13 @@ class Exercise(Base):
 class FoodLog(Base):
     __tablename__ = "food_logs"
 
-    id                = Column(Integer, primary_key=True)
-    user_id           = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    food_id           = Column(Integer, ForeignKey("foods.id", ondelete="RESTRICT"), nullable=False)
-    log_date          = Column(Date, nullable=False, server_default=func.current_date())
-    meal_type         = Column(String(20))          # breakfast, lunch, dinner, snack
-    quantity_g        = Column(Float, nullable=False)
-    calories_consumed = Column(Float)               # Calculé par ETL : (calories_per_100g / 100) * quantity_g
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    food_id: Mapped[int] = mapped_column(Integer, ForeignKey("foods.id", ondelete="RESTRICT"), nullable=False)
+    log_date: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
+    meal_type: Mapped[str | None] = mapped_column(String(20))  # breakfast, lunch, dinner, snack
+    quantity_g: Mapped[float] = mapped_column(Float, nullable=False)
+    calories_consumed: Mapped[float | None] = mapped_column(Float)  # Calculé par ETL : (calories_per_100g / 100) * quantity_g
 
     __table_args__ = (
         CheckConstraint(
@@ -134,8 +133,8 @@ class FoodLog(Base):
     )
 
     # Relations
-    user = relationship("User", back_populates="food_logs")
-    food = relationship("Food", back_populates="food_logs")
+    user: Mapped[User] = relationship(back_populates="food_logs")
+    food: Mapped[Food] = relationship(back_populates="food_logs")
 
 
 # =============================================================================
@@ -146,13 +145,13 @@ class FoodLog(Base):
 class WorkoutSession(Base):
     __tablename__ = "workout_sessions"
 
-    id              = Column(Integer, primary_key=True)
-    user_id         = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    session_date    = Column(Date, nullable=False, server_default=func.current_date())
-    duration_min    = Column(Integer)
-    calories_burned = Column(Float)
-    avg_bpm         = Column(Float)                 # Fréquence cardiaque moyenne durant la session
-    max_bpm         = Column(Float)                 # Fréquence cardiaque maximale atteinte
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_date: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
+    duration_min: Mapped[int | None] = mapped_column(Integer)
+    calories_burned: Mapped[float | None] = mapped_column(Float)
+    avg_bpm: Mapped[float | None] = mapped_column(Float)  # Fréquence cardiaque moyenne durant la session
+    max_bpm: Mapped[float | None] = mapped_column(Float)  # Fréquence cardiaque maximale atteinte
 
     __table_args__ = (
         CheckConstraint("duration_min > 0",    name="ck_workout_sessions_duration_min"),
@@ -162,8 +161,8 @@ class WorkoutSession(Base):
     )
 
     # Relations
-    user              = relationship("User", back_populates="workout_sessions")
-    session_exercises = relationship("SessionExercise", back_populates="session", cascade="all, delete-orphan")
+    user: Mapped[User] = relationship(back_populates="workout_sessions")
+    session_exercises: Mapped[list[SessionExercise]] = relationship(back_populates="session", cascade="all, delete-orphan")
 
 
 # =============================================================================
@@ -174,12 +173,12 @@ class WorkoutSession(Base):
 class SessionExercise(Base):
     __tablename__ = "session_exercises"
 
-    id           = Column(Integer, primary_key=True)
-    session_id   = Column(Integer, ForeignKey("workout_sessions.id", ondelete="CASCADE"),  nullable=False)
-    exercise_id  = Column(Integer, ForeignKey("exercises.id",        ondelete="RESTRICT"), nullable=False)
-    sets         = Column(Integer)
-    reps         = Column(Integer)
-    duration_sec = Column(Integer)                  # Durée en secondes, pour exercices chronométrés (planche, cardio...)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("workout_sessions.id", ondelete="CASCADE"), nullable=False)
+    exercise_id: Mapped[int] = mapped_column(Integer, ForeignKey("exercises.id", ondelete="RESTRICT"), nullable=False)
+    sets: Mapped[int | None] = mapped_column(Integer)
+    reps: Mapped[int | None] = mapped_column(Integer)
+    duration_sec: Mapped[int | None] = mapped_column(Integer)  # Durée en secondes, pour exercices chronométrés (planche, cardio...)
 
     __table_args__ = (
         CheckConstraint("sets > 0",         name="ck_session_exercises_sets"),
@@ -188,8 +187,8 @@ class SessionExercise(Base):
     )
 
     # Relations
-    session  = relationship("WorkoutSession", back_populates="session_exercises")
-    exercise = relationship("Exercise",       back_populates="session_exercises")
+    session: Mapped[WorkoutSession] = relationship(back_populates="session_exercises")
+    exercise: Mapped[Exercise] = relationship(back_populates="session_exercises")
 
 
 # =============================================================================
@@ -200,13 +199,13 @@ class SessionExercise(Base):
 class BiometricMetric(Base):
     __tablename__ = "biometric_metrics"
 
-    id           = Column(Integer, primary_key=True)
-    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    record_date  = Column(Date, nullable=False, server_default=func.current_date())
-    weight_kg    = Column(Float)
-    sleep_hours  = Column(Float)
-    resting_bpm  = Column(Float)
-    notes        = Column(Text)                     # Observations libres : fatigue, maladie, conditions particulières
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    record_date: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
+    weight_kg: Mapped[float | None] = mapped_column(Float)
+    sleep_hours: Mapped[float | None] = mapped_column(Float)
+    resting_bpm: Mapped[float | None] = mapped_column(Float)
+    notes: Mapped[str | None] = mapped_column(Text)  # Observations libres : fatigue, maladie, conditions particulières
 
     __table_args__ = (
         CheckConstraint("weight_kg > 0",                       name="ck_biometric_weight_kg"),
@@ -215,4 +214,4 @@ class BiometricMetric(Base):
     )
 
     # Relations
-    user = relationship("User", back_populates="biometric_metrics")
+    user: Mapped[User] = relationship(back_populates="biometric_metrics")
