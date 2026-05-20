@@ -5,29 +5,15 @@
       <div class="flex items-center justify-between h-16">
 
         <!-- Logo -->
-        <RouterLink to="/" class="flex items-center gap-2.5 group">
-          <!-- Icône bouclier -->
-          <svg viewBox="0 0 48 48" class="h-9 w-9 shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <!-- Bouclier -->
-            <path d="M24 4L6 11V24C6 34 14 42 24 45C34 42 42 34 42 24V11L24 4Z"
-                  fill="#123C69" stroke="#00B4D8" stroke-width="1.5"/>
-            <!-- Croix médicale -->
-            <rect x="20" y="14" width="8" height="20" rx="2" fill="white"/>
-            <rect x="14" y="20" width="20" height="8" rx="2" fill="white"/>
-            <!-- Circuits IA (cyan) -->
-            <circle cx="36" cy="20" r="2" fill="#00B4D8"/>
-            <circle cx="36" cy="28" r="2" fill="#00B4D8"/>
-            <circle cx="41" cy="24" r="1.5" fill="#00B4D8"/>
-            <line x1="36" y1="20" x2="36" y2="28" stroke="#00B4D8" stroke-width="1.2"/>
-            <line x1="36" y1="24" x2="41" y2="24" stroke="#00B4D8" stroke-width="1.2"/>
-            <line x1="36" y1="20" x2="39" y2="17" stroke="#00B4D8" stroke-width="1.2"/>
-            <circle cx="39" cy="17" r="1.5" fill="#00B4D8"/>
-          </svg>
-          <!-- Texte logo — masqué sur mobile -->
-          <span class="hidden sm:flex flex-col leading-tight">
-            <span class="text-white font-bold text-lg tracking-tight">HealthAI <span class="text-brand-accent">Coach</span></span>
-            <span class="text-slate-400 text-[10px] font-normal tracking-wide">Santé connectée · IA</span>
-          </span>
+        <RouterLink to="/" class="flex items-center group">
+          <!-- Logo horizontal sur desktop — fond blanc arrondi -->
+          <div class="hidden sm:flex items-center bg-white rounded-xl px-3 py-1.5 group-hover:bg-slate-50 transition-colors shadow-sm">
+            <img src="/logo-horizontal.png" alt="HealthAI Coach" class="h-8 object-contain" />
+          </div>
+          <!-- Icône seule sur mobile — fond blanc arrondi -->
+          <div class="sm:hidden flex items-center justify-center bg-white rounded-xl p-1.5 group-hover:bg-slate-50 transition-colors shadow-sm">
+            <img src="/logo-icon.png" alt="HealthAI Coach" class="h-8 w-8 object-contain" />
+          </div>
         </RouterLink>
 
         <!-- Liens desktop -->
