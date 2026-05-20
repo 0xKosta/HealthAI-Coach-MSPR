@@ -141,6 +141,118 @@ uvicorn api.main:app --reload
 
 ---
 
+## Contrat d'interface Frontend ↔ Backend
+
+> Cette section est destinée aux développeurs qui implémentent ou font évoluer les endpoints consommés par le frontend Vue 3 (`front-end/`).
+
+### Endpoints existants
+
+#### `GET /users/`
+```json
+[
+  {
+    "id": 1,
+    "name": "string",
+    "age": 30,
+    "gender": "male | female | other",
+    "weight_kg": 75.0,
+    "height_cm": 178,
+    "bmi": 23.7,
+    "body_fat_pct": 18.5,
+    "goal": "weight_loss | muscle_gain | sleep_improvement | maintenance"
+  }
+]
+```
+
+#### `GET /metrics/`
+```json
+[
+  {
+    "user_id": 1,
+    "date": "2024-04-15",
+    "weight_kg": 74.5,
+    "sleep_hours": 7.2,
+    "resting_bpm": 62
+  }
+]
+```
+
+#### `POST /coach/advice`
+**Body :** `{ "user_id": 1 }`
+```json
+{
+  "user_id": 1,
+  "user_name": "string",
+  "advice": "string (texte, markdown supporté)"
+}
+```
+
+---
+
+### Endpoints à implémenter
+
+Ces 3 endpoints sont appelés par le frontend mais **n'existent pas encore** dans `api/routers/coach.py`.
+
+#### `POST /coach/analyze-photo`
+**Body :**
+```json
+{ "user_id": 1, "image_base64": "..." }
+```
+**Réponse attendue :**
+```json
+{
+  "user_id": 1,
+  "user_name": "string",
+  "foods_detected": ["Poulet", "Riz", "Brocolis"],
+  "macros": {
+    "calories": 520,
+    "protein_g": 38,
+    "carbs_g": 45,
+    "fat_g": 12
+  },
+  "advice": "string (texte, markdown supporté)"
+}
+```
+> Utiliser GPT-4o avec `detail: "low"` sur l'image base64 pour détecter les aliments et estimer les macros.
+
+---
+
+#### `POST /coach/workout-plan`
+**Body :**
+```json
+{ "user_id": 1, "equipment": "dumbbell", "days_per_week": 3 }
+```
+Valeurs possibles pour `equipment` : `none`, `dumbbell`, `barbell`, `machine`, `resistance`, `full`
+
+**Réponse attendue :**
+```json
+{
+  "user_id": 1,
+  "user_name": "string",
+  "plan": "string (texte, markdown supporté)"
+}
+```
+> Générer un programme hebdomadaire structuré en fonction de l'objectif utilisateur, de l'équipement et du nombre de jours.
+
+---
+
+#### `POST /coach/biometric-trend`
+**Body :**
+```json
+{ "user_id": 1 }
+```
+**Réponse attendue :**
+```json
+{
+  "user_id": 1,
+  "user_name": "string",
+  "analysis": "string (texte, markdown supporté)"
+}
+```
+> Récupérer les 30 dernières entrées `biometric_metrics` de l'utilisateur et les passer à GPT pour une analyse des tendances (poids, sommeil, BPM).
+
+---
+
 ## Lancer le pipeline ETL (Rôle A)
 
 ```bash
