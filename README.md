@@ -94,15 +94,10 @@ Ouvrir `.env` et renseigner :
 ```env
 DATABASE_URL=postgresql+psycopg2://user:password@host:port/dbname
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000
-OPENAI_API_KEY=sk-...
-LOG_LEVEL=INFO
 ```
 
-> - L'URL de connexion Supabase se trouve dans le dashboard du projet :
->   **Settings → Database → Connection string → URI** (mode `psycopg2`)
-> - La clé OpenAI se génère sur [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
->   Elle est nécessaire pour tous les endpoints `/coach/*` (GPT-4o).
->   **Ne jamais la committer** — elle est exclue par `.gitignore`.
+> L'URL de connexion Supabase se trouve dans le dashboard du projet :
+> **Settings → Database → Connection string → URI** (mode `psycopg2`)
 
 ### 5. Initialiser la base de données
 

@@ -44,7 +44,7 @@
               <p class="text-xs text-slate-400">Poids</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ user.height_cm }} cm</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ (user.height_cm / 100).toFixed(2) }} m</p>
               <p class="text-xs text-slate-400">Taille</p>
             </div>
           </div>
