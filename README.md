@@ -172,7 +172,7 @@ uvicorn api.main:app --reload
 [
   {
     "user_id": 1,
-    "date": "2024-04-15",
+    "record_date": "2024-04-15",
     "weight_kg": 74.5,
     "sleep_hours": 7.2,
     "resting_bpm": 62

@@ -5,7 +5,7 @@
       <select
         :value="modelValue"
         @change="$emit('update:modelValue', Number($event.target.value))"
-        class="select pr-10 min-w-[200px]"
+        class="select pr-10 min-w-[200px] appearance-none"
       >
         <option v-for="user in users" :key="user.id" :value="user.id">
           {{ user.name }} — {{ goalLabel(user.goal) }}

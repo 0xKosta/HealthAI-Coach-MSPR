@@ -123,7 +123,7 @@ const trendError = ref('')
 const userMetrics = computed(() =>
   allMetrics.value
     .filter(m => m.user_id === userStore.selectedUserId)
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => new Date(a.record_date) - new Date(b.record_date))
     .slice(-30)
 )
 const latestMetric  = computed(() => userMetrics.value.at(-1))
@@ -144,7 +144,7 @@ const avgBpm = computed(() => {
 })
 
 const xCategories = computed(() =>
-  userMetrics.value.map(m => { const d = new Date(m.date); return `${d.getDate()}/${d.getMonth() + 1}` })
+  userMetrics.value.map(m => { const d = new Date(m.record_date); return `${d.getDate()}/${d.getMonth() + 1}` })
 )
 
 const chartBase = {
