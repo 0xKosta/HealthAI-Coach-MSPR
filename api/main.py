@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 
-from api.routers import users, nutrition, exercises, metrics
+from api.routers import users, nutrition, exercises, metrics, coach
 
 load_dotenv()
 
@@ -32,6 +32,7 @@ app.include_router(users.router,     prefix="/users",     tags=["Utilisateurs"])
 app.include_router(nutrition.router, prefix="/nutrition", tags=["Nutrition"])
 app.include_router(exercises.router, prefix="/exercises", tags=["Exercices"])
 app.include_router(metrics.router,   prefix="/metrics",   tags=["Métriques"])
+app.include_router(coach.router,     prefix="/coach",     tags=["Coach IA"])
 
 @app.get("/health", tags=["Santé"], summary="Vérifier l'état de l'API")
 def health_check():
