@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { @apply scroll-smooth; }
+  body { @apply bg-brand-light text-brand-text font-sans; }
+}
+
+@layer components {
+  /* Boutons */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5
+           bg-brand-accent hover:bg-cyan-500 active:bg-cyan-600
+           text-white font-semibold rounded-xl transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-accent/40 focus:ring-offset-2 focus:ring-offset-brand-light
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-5 py-2.5
+           bg-white border border-slate-200 hover:border-brand-accent/60 hover:bg-brand-light
+           text-brand-text font-semibold rounded-xl transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-brand-accent/30 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-5 py-2.5
+           bg-brand-error hover:bg-red-700 text-white font-semibold rounded-xl transition-all duration-200;
+  }
+
+  /* Cartes — fond neutre #F4F7FB */
+  .card {
+    @apply bg-brand-neutral border border-slate-200 rounded-2xl p-6 shadow-sm;
+  }
+  .card-sm {
+    @apply bg-brand-neutral border border-slate-200 rounded-xl p-4 shadow-sm;
+  }
+  /* Carte blanche (variante plus lumineuse) */
+  .card-white {
+    @apply bg-white border border-slate-200 rounded-2xl p-6 shadow-sm;
+  }
+
+  /* Formulaires */
+  .input {
+    @apply w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5
+           text-brand-text placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-brand-accent/50 focus:border-brand-accent
+           transition-all duration-200;
+  }
+  .select {
+    @apply w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5
+           text-brand-text
+           focus:outline-none focus:ring-2 focus:ring-brand-accent/50 focus:border-brand-accent
+           transition-all duration-200 cursor-pointer;
+  }
+  .label {
+    @apply block text-sm font-medium text-slate-500 mb-1.5;
+  }
+
+  /* Badges */
+  .badge-success {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5
+           bg-brand-success/15 text-teal-700 text-xs font-semibold rounded-full;
+  }
+  .badge-warning {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5
+           bg-brand-warning/15 text-amber-700 text-xs font-semibold rounded-full;
+  }
+  .badge-error {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5
+           bg-brand-error/10 text-red-700 text-xs font-semibold rounded-full;
+  }
+  .badge-accent {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5
+           bg-brand-accent/10 text-cyan-700 text-xs font-semibold rounded-full;
+  }
+  .badge-primary {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5
+           bg-brand-primary/10 text-brand-primary text-xs font-semibold rounded-full;
+  }
+
+  /* Titres */
+  .section-title {
+    @apply text-2xl font-bold text-brand-primary;
+  }
+
+  /* Carte IA — dégradé bleu nuit */
+  .ai-card {
+    @apply bg-gradient-to-br from-brand-primary to-brand-secondary
+           border border-brand-secondary/60 rounded-2xl p-6 shadow-md;
+  }
+}
+
+/* Google Material Symbols */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: #EEF6FF; }
+::-webkit-scrollbar-thumb { background: #c7d9ee; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #00B4D8; }
+
+/* Prose IA — texte sur fond sombre (ai-card) */
+.ai-prose h1, .ai-prose h2, .ai-prose h3 {
+  @apply font-bold text-brand-accent mb-2 mt-4;
+}
+.ai-prose p    { @apply text-slate-200 mb-3 leading-relaxed; }
+.ai-prose ul, .ai-prose ol { @apply pl-5 mb-3 space-y-1; }
+.ai-prose li   { @apply text-slate-200; }
+.ai-prose ul li { list-style-type: disc; }
+.ai-prose ol li { list-style-type: decimal; }
+.ai-prose strong { @apply text-white font-semibold; }

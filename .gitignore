@@ -42,6 +42,13 @@ logs/
 *.sqlite3
 *.db
 
+# Front-end
+front-end/node_modules/
+front-end/dist/
+front-end/.env
+front-end/.env.*
+!front-end/.env.example
+
 # IDE / OS
 .vscode/
 .idea/

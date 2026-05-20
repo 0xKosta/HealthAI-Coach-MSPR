@@ -1,0 +1,223 @@
+<template>
+  <div class="space-y-8 animate-fade-in">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-brand-primary">Dashboard</h1>
+        <p class="text-slate-500 mt-1">Vue d'ensemble de votre santé personnalisée</p>
+      </div>
+      <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
+    </div>
+
+    <LoadingSpinner v-if="userStore.loading" message="Chargement des utilisateurs..." />
+    <ErrorAlert v-else-if="userStore.error" :message="userStore.error" />
+
+    <template v-else-if="user">
+
+      <!-- Profil + Stats -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        <!-- Carte profil — fond #F4F7FB -->
+        <div class="card lg:col-span-1">
+          <div class="flex items-center gap-4 mb-5">
+            <div class="w-14 h-14 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-2xl font-bold text-brand-primary">
+              {{ user.name.charAt(0).toUpperCase() }}
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-brand-primary">{{ user.name }}</h2>
+              <span :class="goalBadgeClass">{{ goalLabel }}</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
+              <p class="text-2xl font-bold text-brand-primary">{{ user.age }}</p>
+              <p class="text-xs text-slate-400">ans</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
+              <p class="text-2xl font-bold" :class="bmiColor">{{ user.bmi?.toFixed(1) }}</p>
+              <p class="text-xs text-slate-400">IMC</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
+              <p class="text-2xl font-bold text-brand-primary">{{ user.weight_kg }} kg</p>
+              <p class="text-xs text-slate-400">Poids</p>
+            </div>
+            <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
+              <p class="text-2xl font-bold text-brand-primary">{{ user.height_cm }} cm</p>
+              <p class="text-xs text-slate-400">Taille</p>
+            </div>
+          </div>
+
+          <div v-if="user.body_fat_pct" class="mt-3 bg-white rounded-xl p-3 border border-slate-100">
+            <div class="flex justify-between mb-1.5">
+              <span class="text-xs text-slate-500">Masse grasse</span>
+              <span class="text-xs font-semibold text-brand-secondary">{{ user.body_fat_pct?.toFixed(1) }}%</span>
+            </div>
+            <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-brand-accent to-brand-success transition-all duration-700"
+                   :style="{ width: `${Math.min(user.body_fat_pct, 50) * 2}%` }"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats rapides -->
+        <div class="lg:col-span-2 grid grid-cols-2 gap-4">
+          <StatCard
+            label="Score santé estimé"
+            :value="healthScore"
+            sub="Basé sur l'IMC et objectif"
+            icon='<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'
+            iconBg="bg-brand-success/15"
+            iconColor="text-teal-600"
+          />
+          <StatCard
+            label="Objectif"
+            :value="goalLabel"
+            :sub="genderLabel"
+            icon='<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>'
+            iconBg="bg-brand-accent/10"
+            iconColor="text-brand-accent"
+          />
+          <StatCard
+            label="IMC"
+            :value="bmiCategory"
+            :sub="`${user.bmi?.toFixed(1)} kg/m²`"
+            :icon='`<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>`'
+            :iconBg="bmiIconBg"
+            :iconColor="bmiIconColor"
+          />
+          <StatCard
+            label="Statut"
+            value="Suivi actif"
+            sub="Données synchronisées"
+            icon='<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+            iconBg="bg-brand-success/15"
+            iconColor="text-teal-600"
+          />
+        </div>
+      </div>
+
+      <!-- Conseil IA -->
+      <div class="card">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-brand-primary">Conseil personnalisé</h2>
+            <p class="text-sm text-slate-500 mt-0.5">Analyse IA basée sur votre profil complet</p>
+          </div>
+          <button @click="fetchAdvice" :disabled="adviceLoading" class="btn-primary">
+            <div v-if="adviceLoading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+            </svg>
+            {{ adviceLoading ? 'Analyse en cours...' : 'Obtenir un conseil IA' }}
+          </button>
+        </div>
+
+        <ErrorAlert v-if="adviceError" :message="adviceError" />
+
+        <div v-if="!advice && !adviceLoading && !adviceError"
+             class="flex flex-col items-center justify-center py-10 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-brand-accent/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M12 2a10 10 0 1 0 10 10"/><circle cx="18" cy="6" r="3" fill="currentColor"/>
+            </svg>
+          </div>
+          <p class="text-slate-400 text-sm">Cliquez sur le bouton pour recevoir un conseil personnalisé</p>
+        </div>
+
+        <!-- Carte IA — fond bleu nuit #08104D (zone structurante) -->
+        <AIAdviceCard v-if="advice" :title="`Conseil pour ${user.name}`" :content="advice" />
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { useUserStore } from '@/stores/userStore'
+import { coachAPI } from '@/services/api'
+import UserSelector from '@/components/ui/UserSelector.vue'
+import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
+import ErrorAlert from '@/components/ui/ErrorAlert.vue'
+import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+
+const userStore = useUserStore()
+const user = computed(() => userStore.selectedUser)
+
+const advice = ref('')
+const adviceLoading = ref(false)
+const adviceError = ref('')
+
+watch(() => userStore.selectedUserId, () => { advice.value = ''; adviceError.value = '' })
+
+const goalLabels = {
+  weight_loss: 'Perte de poids', muscle_gain: 'Prise de muscle',
+  sleep_improvement: 'Améliorer le sommeil', maintenance: 'Maintien',
+}
+const genderLabels = { male: 'Homme', female: 'Femme', other: 'Autre' }
+
+const goalLabel   = computed(() => goalLabels[user.value?.goal] || user.value?.goal)
+const genderLabel = computed(() => genderLabels[user.value?.gender] || user.value?.gender)
+
+const goalBadgeClass = computed(() => ({
+  weight_loss: 'badge-accent', muscle_gain: 'badge-success',
+  sleep_improvement: 'badge-warning', maintenance: 'badge-primary',
+}[user.value?.goal] || 'badge-primary'))
+
+const bmiColor = computed(() => {
+  const b = user.value?.bmi
+  if (!b) return 'text-brand-primary'
+  if (b < 18.5) return 'text-brand-warning'
+  if (b < 25)   return 'text-teal-600'
+  if (b < 30)   return 'text-brand-warning'
+  return 'text-brand-error'
+})
+const bmiIconBg = computed(() => {
+  const b = user.value?.bmi
+  if (!b) return 'bg-slate-100'
+  if (b >= 18.5 && b < 25) return 'bg-brand-success/15'
+  if (b < 30) return 'bg-brand-warning/15'
+  return 'bg-brand-error/10'
+})
+const bmiIconColor = computed(() => {
+  const b = user.value?.bmi
+  if (!b) return 'text-slate-400'
+  if (b >= 18.5 && b < 25) return 'text-teal-600'
+  if (b < 30) return 'text-amber-600'
+  return 'text-brand-error'
+})
+const bmiCategory = computed(() => {
+  const b = user.value?.bmi
+  if (!b) return '—'
+  if (b < 18.5) return 'Insuffisant'
+  if (b < 25)   return 'Normal'
+  if (b < 30)   return 'Surpoids'
+  return 'Obésité'
+})
+const healthScore = computed(() => {
+  const u = user.value
+  if (!u) return '—'
+  let s = 50
+  const b = u.bmi
+  if (b >= 18.5 && b < 25) s += 30
+  else if (b >= 25 && b < 30) s += 10
+  if (u.goal === 'maintenance') s += 10
+  if (u.goal === 'muscle_gain') s += 5
+  return `${Math.min(s, 100)}/100`
+})
+
+async function fetchAdvice() {
+  if (!user.value) return
+  adviceLoading.value = true; adviceError.value = ''; advice.value = ''
+  try {
+    const res = await coachAPI.getAdvice(user.value.id)
+    advice.value = res.data.advice
+  } catch {
+    adviceError.value = "Impossible d'obtenir un conseil. Vérifiez la connexion à l'API."
+  } finally {
+    adviceLoading.value = false
+  }
+}
+</script>
