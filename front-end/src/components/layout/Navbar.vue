@@ -17,12 +17,12 @@
         </RouterLink>
 
         <!-- Liens desktop -->
-        <div class="hidden sm:flex items-center gap-1">
+        <div class="hidden sm:flex items-center gap-2">
           <RouterLink
             v-for="link in navLinks"
             :key="link.to"
             :to="link.to"
-            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
             :class="isActive(link.to)
               ? 'bg-brand-accent text-white'
               : 'text-slate-300 hover:text-white hover:bg-white/10'"

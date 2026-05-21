@@ -17,7 +17,7 @@ export const nutritionAPI = {
 }
 
 export const exercisesAPI = {
-  getAll: () => api.get('/exercises/')
+  getAll: () => api.get('/exercises/?limit=1000')
 }
 
 export const metricsAPI = {

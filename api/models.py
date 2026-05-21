@@ -92,6 +92,7 @@ class Exercise(Base):
     equipment: Mapped[str | None] = mapped_column(String(100))  # barbell, dumbbell, bodyweight, cable...
     level: Mapped[str | None] = mapped_column(String(50))  # beginner, intermediate, expert
     instructions: Mapped[str | None] = mapped_column(Text)
+    instructions_fr: Mapped[str | None] = mapped_column(Text)
     gif_url: Mapped[str | None] = mapped_column(Text)
     video_url: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(Text)
