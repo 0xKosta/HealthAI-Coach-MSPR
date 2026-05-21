@@ -80,13 +80,22 @@ foods(
 )
 
 exercises(
-    id*           INTEGER    PK auto-incremente,
-    name*         VARCHAR(200),
-    type          VARCHAR(100),
-    muscle_group  VARCHAR(100),
-    equipment     VARCHAR(100),
-    level         VARCHAR(50),
-    instructions  TEXT
+    id*              INTEGER    PK auto-incremente,
+    name*            VARCHAR(200),
+    name_fr          VARCHAR(200),
+    type             VARCHAR(100),
+    type_fr          VARCHAR(100),
+    muscle_group     VARCHAR(100),
+    muscle_group_fr  VARCHAR(100),
+    equipment        VARCHAR(100),
+    equipment_fr     VARCHAR(100),
+    level            VARCHAR(50),
+    level_fr         VARCHAR(50),
+    instructions     TEXT,
+    instructions_fr  TEXT,
+    gif_url          TEXT,
+    video_url        TEXT,
+    image_url        TEXT
 )
 
 food_logs(
@@ -161,13 +170,22 @@ Table foods {
 }
 
 Table exercises {
-  id           integer  [pk, increment]
-  name         varchar  [not null]
-  type         varchar
-  muscle_group varchar
-  equipment    varchar
-  level        varchar
-  instructions text
+  id              integer  [pk, increment]
+  name            varchar  [not null, note: "EN"]
+  name_fr         varchar  [note: "FR - traduction automatique"]
+  type            varchar  [note: "EN"]
+  type_fr         varchar  [note: "FR"]
+  muscle_group    varchar  [note: "EN"]
+  muscle_group_fr varchar  [note: "FR"]
+  equipment       varchar  [note: "EN"]
+  equipment_fr    varchar  [note: "FR"]
+  level           varchar  [note: "EN - beginner / intermediate / expert"]
+  level_fr        varchar  [note: "FR - debutant / intermediaire / expert"]
+  instructions    text     [note: "EN"]
+  instructions_fr text     [note: "FR - traduction automatique"]
+  gif_url         text
+  video_url       text
+  image_url       text
 }
 
 Table food_logs {
@@ -222,6 +240,25 @@ Table biometric_metrics {
 ---
 
 ## 5. Justifications des choix de conception
+
+### Internationalisation EN / FR de la table exercises
+
+La table `exercises` embarque deux versions linguistiques pour chaque champ textuel :
+les colonnes anglaises issues de la source ExerciseDB (`name`, `type`, `muscle_group`,
+`equipment`, `level`, `instructions`) et leurs equivalents francais
+(`name_fr`, `type_fr`, `muscle_group_fr`, `equipment_fr`, `level_fr`, `instructions_fr`)
+generes par traduction automatique via le script Python `translate_exercises_full.py`
+(bibliotheque `deep-translator`, moteur Google Translate).
+
+L'API expose un parametre `?lang=en` (defaut) ou `?lang=fr` sur les endpoints
+`GET /exercises` et `GET /exercises/{id}`. Le front-end n'a qu'a passer ce parametre
+selon le choix de l'utilisateur dans la liste deroulante de langue.
+
+Cette approche de **colonnes paralleles** a ete preferee a une table de traductions
+separee pour sa simplicite d'interrogation (pas de JOIN supplementaire) et ses
+performances en lecture.
+
+---
 
 ### Pourquoi du relationnel (SQL) et pas du NoSQL ?
 
