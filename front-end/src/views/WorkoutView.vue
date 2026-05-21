@@ -123,8 +123,8 @@
       <div v-if="!exLoading && paginatedExercises.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
           v-for="ex in paginatedExercises" :key="ex.id"
-          class="bg-white border border-slate-100 rounded-xl overflow-hidden hover:shadow-md hover:border-brand-accent/30 transition-all duration-200 cursor-pointer"
-          @click="toggleExpand(ex.id)"
+          class="bg-white border border-slate-100 rounded-xl overflow-hidden hover:shadow-md hover:border-brand-accent/30 transition-all duration-200 cursor-pointer group"
+          @click="openModal(ex)"
         >
           <!-- GIF / Image -->
           <div class="relative h-44 bg-brand-light flex items-center justify-center overflow-hidden">
@@ -132,7 +132,7 @@
               v-if="ex.gif_url || ex.image_url"
               :src="ex.gif_url || ex.image_url"
               :alt="ex.name"
-              class="h-full w-full object-cover"
+              class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
               @error="(e) => e.target.style.display='none'"
             />
@@ -152,6 +152,12 @@
                 'bg-brand-error/10 text-red-700':    ex.level === 'expert',
               }"
             >{{ levelLabel(ex.level) }}</span>
+            <!-- Overlay "voir détails" -->
+            <div class="absolute inset-0 bg-brand-primary/0 group-hover:bg-brand-primary/10 transition-colors duration-200 flex items-center justify-center">
+              <span class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/90 text-brand-primary text-xs font-semibold px-3 py-1.5 rounded-full shadow">
+                Voir les détails
+              </span>
+            </div>
           </div>
 
           <!-- Infos -->
@@ -165,18 +171,125 @@
               <span v-if="ex.equipment" class="badge-accent text-[11px]">{{ translateEquipment(ex.equipment) }}</span>
               <span v-if="ex.type" class="bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-0.5 rounded-full">{{ translateType(ex.type) }}</span>
             </div>
-
-            <!-- Instructions (dépliables) -->
-            <div v-if="expandedId === ex.id && ex.instructions_fr" class="mt-3 pt-3 border-t border-slate-100">
-              <p class="text-xs text-slate-600 leading-relaxed">{{ ex.instructions_fr }}</p>
-            </div>
-            <div v-if="ex.instructions_fr" class="mt-2 flex items-center gap-1 text-xs text-brand-accent font-medium">
-              <svg class="w-3 h-3 transition-transform" :class="expandedId === ex.id ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-              {{ expandedId === ex.id ? 'Masquer' : 'Voir les instructions' }}
-            </div>
           </div>
         </div>
       </div>
+
+    <!-- ── Modale détail exercice ─────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div
+          v-if="selectedExercise"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          @click.self="closeModal"
+        >
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="closeModal" />
+
+          <!-- Panneau -->
+          <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto z-10">
+
+            <!-- Image / GIF -->
+            <div class="relative h-56 bg-brand-light flex items-center justify-center overflow-hidden rounded-t-2xl">
+              <img
+                v-if="selectedExercise.gif_url || selectedExercise.image_url"
+                :src="selectedExercise.gif_url || selectedExercise.image_url"
+                :alt="selectedExercise.name"
+                class="h-full w-full object-cover"
+                @error="(e) => e.target.style.display='none'"
+              />
+              <div v-else class="flex flex-col items-center gap-2 text-slate-300">
+                <svg class="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M6 4v16M18 4v16M10 8H6M10 16H6M18 8h-4M18 16h-4"/>
+                </svg>
+                <span class="text-sm">Pas d'image</span>
+              </div>
+              <!-- Niveau badge -->
+              <span
+                v-if="selectedExercise.level"
+                class="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full"
+                :class="{
+                  'bg-brand-success/20 text-teal-700': selectedExercise.level === 'beginner',
+                  'bg-brand-warning/20 text-amber-700': selectedExercise.level === 'intermediate',
+                  'bg-brand-error/10 text-red-700':    selectedExercise.level === 'expert',
+                }"
+              >{{ levelLabel(selectedExercise.level) }}</span>
+              <!-- Bouton fermer -->
+              <button
+                @click="closeModal"
+                class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/80 hover:bg-white shadow flex items-center justify-center text-slate-500 hover:text-brand-primary transition-colors"
+              >
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Contenu -->
+            <div class="p-6 space-y-5">
+
+              <!-- Nom -->
+              <h2 class="text-xl font-bold text-brand-primary leading-tight">{{ selectedExercise.name }}</h2>
+
+              <!-- Tags -->
+              <div class="flex flex-wrap gap-2">
+                <span v-if="selectedExercise.muscle_group" class="badge-primary">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>
+                  {{ translateMuscle(selectedExercise.muscle_group) }}
+                </span>
+                <span v-if="selectedExercise.type" class="bg-slate-100 text-slate-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                  {{ translateType(selectedExercise.type) }}
+                </span>
+                <span v-if="selectedExercise.equipment" class="badge-accent">
+                  {{ translateEquipment(selectedExercise.equipment) }}
+                </span>
+              </div>
+
+              <!-- Séparateur -->
+              <div class="border-t border-slate-100" />
+
+              <!-- Instructions -->
+              <div v-if="selectedExercise.instructions_fr || selectedExercise.instructions">
+                <h3 class="text-sm font-semibold text-brand-primary mb-2 flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-brand-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                  </svg>
+                  Instructions
+                </h3>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                  {{ selectedExercise.instructions_fr || selectedExercise.instructions }}
+                </p>
+              </div>
+
+              <!-- Lien vidéo -->
+              <div v-if="selectedExercise.video_url">
+                <div class="border-t border-slate-100 mb-4" />
+                <a
+                  :href="selectedExercise.video_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center gap-3 w-full px-4 py-3 bg-red-50 hover:bg-red-100 border border-red-200 hover:border-red-300 rounded-xl transition-colors group/video"
+                >
+                  <div class="w-9 h-9 rounded-lg bg-red-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-red-700">Voir la vidéo de démonstration</p>
+                    <p class="text-xs text-red-500 truncate">{{ selectedExercise.video_url }}</p>
+                  </div>
+                  <svg class="w-4 h-4 text-red-400 group-hover/video:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                  </svg>
+                </a>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
       <!-- Empty state filtres -->
       <div v-if="!exLoading && !paginatedExercises.length" class="flex flex-col items-center py-12 text-center">
@@ -259,7 +372,7 @@ const exLoading = ref(false)
 const search = ref('')
 const filterMuscle = ref('')
 const filterEquipment = ref('')
-const expandedId = ref(null)
+const selectedExercise = ref(null)
 const currentPage = ref(1)
 const PAGE_SIZE = 12
 
@@ -292,8 +405,13 @@ const paginatedExercises = computed(() => {
 
 watch([search, filterMuscle, filterEquipment], () => { currentPage.value = 1 })
 
-function toggleExpand(id) {
-  expandedId.value = expandedId.value === id ? null : id
+function openModal(ex) {
+  selectedExercise.value = ex
+  document.body.style.overflow = 'hidden'
+}
+function closeModal() {
+  selectedExercise.value = null
+  document.body.style.overflow = ''
 }
 
 // ── Dictionnaires de traduction ───────────────────
@@ -364,3 +482,10 @@ async function loadExercises() {
 
 onMounted(() => loadExercises())
 </script>
+
+<style scoped>
+.modal-enter-active { transition: opacity 0.2s ease; }
+.modal-leave-active { transition: opacity 0.15s ease; }
+.modal-enter-from,
+.modal-leave-to     { opacity: 0; }
+</style>
