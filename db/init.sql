@@ -78,29 +78,40 @@ COMMENT ON COLUMN foods.calories_per_100g IS 'Valeur calorique pour 100g de prod
 --
 -- v1.1 : ajout gif_url, video_url, image_url
 -- v1.2 : instructions renommée instructions_en + ajout instructions_fr (traduction FR)
+-- v1.3 : ajout name_fr, type_fr, muscle_group_fr, equipment_fr, level_fr (internationalisation EN/FR)
 -- =============================================================================
 CREATE TABLE exercises (
     id                SERIAL PRIMARY KEY,
     name              VARCHAR(200)    NOT NULL,
+    name_fr           VARCHAR(200),
     type              VARCHAR(100),
+    type_fr           VARCHAR(100),
     muscle_group      VARCHAR(100),
+    muscle_group_fr   VARCHAR(100),
     equipment         VARCHAR(100),
+    equipment_fr      VARCHAR(100),
     level             VARCHAR(50)     CHECK (level IN ('beginner', 'intermediate', 'expert')),
-    instructions_en   TEXT,           -- instructions originales en anglais (ExerciseDB)
-    instructions_fr   TEXT,           -- traduction française générée par script Python
-    gif_url           TEXT,           -- animation GIF du mouvement
-    video_url         TEXT,           -- lien vidéo YouTube
-    image_url         TEXT            -- image statique / thumbnail
+    level_fr          VARCHAR(50),
+    instructions_en   TEXT,
+    instructions_fr   TEXT,
+    gif_url           TEXT,
+    video_url         TEXT,
+    image_url         TEXT
 );
 
 COMMENT ON TABLE  exercises                  IS 'Catalogue d''exercices — source : ExerciseDB (GitHub, format JSON)';
-COMMENT ON COLUMN exercises.muscle_group     IS 'Groupe musculaire principal ciblé';
+COMMENT ON COLUMN exercises.name_fr          IS 'Nom de l''exercice traduit en français';
+COMMENT ON COLUMN exercises.type_fr          IS 'Type d''exercice traduit en français';
+COMMENT ON COLUMN exercises.muscle_group     IS 'Groupe musculaire principal ciblé (EN)';
+COMMENT ON COLUMN exercises.muscle_group_fr  IS 'Groupe musculaire principal ciblé (FR)';
+COMMENT ON COLUMN exercises.equipment_fr     IS 'Équipement requis traduit en français';
 COMMENT ON COLUMN exercises.level            IS 'Niveau de difficulté : beginner, intermediate, expert';
+COMMENT ON COLUMN exercises.level_fr         IS 'Niveau de difficulté en français : débutant, intermédiaire, expert';
 COMMENT ON COLUMN exercises.instructions_en  IS 'Instructions originales en anglais issues d''ExerciseDB';
 COMMENT ON COLUMN exercises.instructions_fr  IS 'Traduction française générée via deep-translator (GoogleTranslator)';
 COMMENT ON COLUMN exercises.gif_url          IS 'URL du GIF animé illustrant le mouvement';
-COMMENT ON COLUMN exercises.video_url    IS 'URL vidéo YouTube de démonstration — player front Bloc 2';
-COMMENT ON COLUMN exercises.image_url    IS 'URL de l''image statique / thumbnail — fallback Bloc 2';
+COMMENT ON COLUMN exercises.video_url        IS 'URL vidéo YouTube de démonstration — player front Bloc 2';
+COMMENT ON COLUMN exercises.image_url        IS 'URL de l''image statique / thumbnail — fallback Bloc 2';
 
 
 -- =============================================================================
