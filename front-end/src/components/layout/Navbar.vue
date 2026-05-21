@@ -81,6 +81,10 @@ const navLinks = [
     icon: '<path d="M6 4v16M18 4v16M10 8H6M10 16H6M18 8h-4M18 16h-4"/>'
   },
   {
+    to: '/exercises', label: 'Exercices', shortLabel: 'Exercices',
+    icon: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>'
+  },
+  {
     to: '/trends', label: 'Tendances', shortLabel: 'Trends',
     icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'
   },
