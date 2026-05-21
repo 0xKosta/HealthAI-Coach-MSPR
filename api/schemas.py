@@ -64,25 +64,40 @@ class FoodResponse(FoodCreate):
 # =============================================================================
 # EXERCISE
 # Source : ExerciseDB (GitHub, JSON)
+# Internationalisation : champs _fr ajoutés en v1.3 pour la liste déroulante EN/FR
 # =============================================================================
 
 class ExerciseCreate(BaseModel):
     """Données requises pour créer ou mettre à jour un exercice (POST / PUT /exercises)."""
 
+    # Champs anglais (source)
     name: str = Field(..., max_length=200)
-    type: Optional[str] = Field(None, max_length=100, description="cardio, strength, flexibility, balance...")
-    muscle_group: Optional[str] = Field(None, max_length=100, description="Groupe musculaire principal ciblé")
-    equipment: Optional[str] = Field(None, max_length=100, description="barbell, dumbbell, bodyweight, cable...")
+    type: Optional[str] = Field(None, max_length=100)
+    muscle_group: Optional[str] = Field(None, max_length=100)
+    equipment: Optional[str] = Field(None, max_length=100)
     level: Optional[Literal["beginner", "intermediate", "expert"]] = None
     instructions: Optional[str] = None
+
+    # Champs français (traduction automatique deep-translator)
+    name_fr: Optional[str] = Field(None, max_length=200)
+    type_fr: Optional[str] = Field(None, max_length=100)
+    muscle_group_fr: Optional[str] = Field(None, max_length=100)
+    equipment_fr: Optional[str] = Field(None, max_length=100)
+    level_fr: Optional[str] = Field(None, max_length=50)
     instructions_fr: Optional[str] = None
+
+    # Médias
     gif_url:   Optional[str] = None
     video_url: Optional[str] = None
     image_url: Optional[str] = None
 
 
 class ExerciseResponse(ExerciseCreate):
-    """Données renvoyées par l'API pour un exercice (GET /exercises)."""
+    """Données renvoyées par l'API pour un exercice (GET /exercises).
+
+    Le front-end utilise le paramètre ?lang=fr pour afficher les champs _fr
+    à la place des champs anglais dans la liste déroulante de langue.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 

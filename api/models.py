@@ -86,13 +86,24 @@ class Exercise(Base):
     __tablename__ = "exercises"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Champs en anglais (source ExerciseDB)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    type: Mapped[str | None] = mapped_column(String(100))  # cardio, strength, flexibility, balance...
-    muscle_group: Mapped[str | None] = mapped_column(String(100))  # Groupe musculaire principal ciblé
-    equipment: Mapped[str | None] = mapped_column(String(100))  # barbell, dumbbell, bodyweight, cable...
-    level: Mapped[str | None] = mapped_column(String(50))  # beginner, intermediate, expert
+    type: Mapped[str | None] = mapped_column(String(100))
+    muscle_group: Mapped[str | None] = mapped_column(String(100))
+    equipment: Mapped[str | None] = mapped_column(String(100))
+    level: Mapped[str | None] = mapped_column(String(50))
     instructions: Mapped[str | None] = mapped_column(Text)
+
+    # Champs traduits en français (v1.3 — internationalisation EN/FR)
+    name_fr: Mapped[str | None] = mapped_column(String(200))
+    type_fr: Mapped[str | None] = mapped_column(String(100))
+    muscle_group_fr: Mapped[str | None] = mapped_column(String(100))
+    equipment_fr: Mapped[str | None] = mapped_column(String(100))
+    level_fr: Mapped[str | None] = mapped_column(String(50))
     instructions_fr: Mapped[str | None] = mapped_column(Text)
+
+    # Médias
     gif_url: Mapped[str | None] = mapped_column(Text)
     video_url: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(Text)

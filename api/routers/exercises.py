@@ -2,6 +2,8 @@
 # CRUD pour Exercise, WorkoutSession et SessionExercise
 # Préfixe monté dans main.py : /exercises
 
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,21 @@ from api.schemas import (
 router = APIRouter()
 
 
+def _apply_lang(exercise: Exercise, lang: str) -> Exercise:
+    """
+    Remplace les champs texte anglais par leurs équivalents français
+    quand lang='fr', pour que le front-end n'ait pas à gérer la logique.
+    """
+    if lang == "fr":
+        exercise.name         = exercise.name_fr         or exercise.name
+        exercise.type         = exercise.type_fr         or exercise.type
+        exercise.muscle_group = exercise.muscle_group_fr or exercise.muscle_group
+        exercise.equipment    = exercise.equipment_fr    or exercise.equipment
+        exercise.level        = exercise.level_fr        or exercise.level
+        exercise.instructions = exercise.instructions_fr or exercise.instructions
+    return exercise
+
+
 # =============================================================================
 # EXERCISES — catalogue des exercices sportifs
 # =============================================================================
@@ -24,27 +41,40 @@ router = APIRouter()
     "/",
     response_model=list[ExerciseResponse],
     summary="Lister les exercices",
-    description="Retourne la liste paginée du catalogue d'exercices (1300+ entrées depuis ExerciseDB).",
+    description=(
+        "Retourne la liste paginée du catalogue d'exercices. "
+        "Paramètre **lang** : `en` (défaut) ou `fr` — les champs name, type, "
+        "muscle_group, equipment, level et instructions sont retournés dans la langue choisie."
+    ),
 )
 def list_exercises(
     skip: int = Query(0, ge=0, description="Nombre d'entrées à ignorer"),
     limit: int = Query(100, ge=1, le=1000, description="Nombre maximum d'entrées à retourner"),
+    lang: Optional[Literal["en", "fr"]] = Query("en", description="Langue de retour : en ou fr"),
     db: Session = Depends(get_db),
 ):
-    return db.query(Exercise).offset(skip).limit(limit).all()
+    exercises = db.query(Exercise).offset(skip).limit(limit).all()
+    return [_apply_lang(e, lang) for e in exercises]
 
 
 @router.get(
     "/{exercise_id}",
     response_model=ExerciseResponse,
     summary="Récupérer un exercice",
-    description="Retourne les détails d'un exercice par son identifiant.",
+    description=(
+        "Retourne les détails d'un exercice par son identifiant. "
+        "Paramètre **lang** : `en` (défaut) ou `fr`."
+    ),
 )
-def get_exercise(exercise_id: int, db: Session = Depends(get_db)):
+def get_exercise(
+    exercise_id: int,
+    lang: Optional[Literal["en", "fr"]] = Query("en", description="Langue de retour : en ou fr"),
+    db: Session = Depends(get_db),
+):
     exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
     if not exercise:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercice introuvable")
-    return exercise
+    return _apply_lang(exercise, lang)
 
 
 @router.post(
