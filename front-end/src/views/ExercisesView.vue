@@ -26,9 +26,9 @@
       </div>
 
       <!-- Filtres -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <!-- Recherche -->
-        <div class="relative">
+        <div class="relative sm:col-span-2 lg:col-span-1">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
@@ -47,6 +47,16 @@
           <select v-model="filterEquipment" class="select appearance-none pr-9">
             <option value="">{{ lang === 'fr' ? 'Tout équipement' : 'All equipment' }}</option>
             <option v-for="e in equipmentList" :key="e" :value="e">{{ filterEquipLabel(e) }}</option>
+          </select>
+          <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <!-- Niveau -->
+        <div class="relative">
+          <select v-model="filterLevel" class="select appearance-none pr-9">
+            <option value="">{{ lang === 'fr' ? 'Tous les niveaux' : 'All levels' }}</option>
+            <option value="beginner">{{ lang === 'fr' ? 'Débutant' : 'Beginner' }}</option>
+            <option value="intermediate">{{ lang === 'fr' ? 'Intermédiaire' : 'Intermediate' }}</option>
+            <option value="expert">{{ lang === 'fr' ? 'Expert' : 'Expert' }}</option>
           </select>
           <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
@@ -78,11 +88,11 @@
             <!-- Niveau badge -->
             <span
               v-if="ex.level"
-              class="absolute top-2 right-2 text-xs font-semibold px-2 py-0.5 rounded-full"
+              class="absolute top-2 right-2 text-xs font-semibold px-2.5 py-0.5 rounded-full shadow-sm"
               :class="{
-                'bg-brand-success/20 text-teal-700': ex.level === 'beginner',
-                'bg-brand-warning/20 text-amber-700': ex.level === 'intermediate',
-                'bg-brand-error/10 text-red-700':    ex.level === 'expert',
+                'bg-teal-500 text-white':   ex.level === 'beginner',
+                'bg-amber-500 text-white':  ex.level === 'intermediate',
+                'bg-red-500 text-white':    ex.level === 'expert',
               }"
             >{{ levelLabel(ex.level) }}</span>
             <!-- Overlay -->
@@ -136,11 +146,11 @@
                 </div>
                 <span
                   v-if="selectedExercise.level"
-                  class="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full"
+                  class="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm"
                   :class="{
-                    'bg-brand-success/20 text-teal-700': selectedExercise.level === 'beginner',
-                    'bg-brand-warning/20 text-amber-700': selectedExercise.level === 'intermediate',
-                    'bg-brand-error/10 text-red-700':    selectedExercise.level === 'expert',
+                    'bg-teal-500 text-white':   selectedExercise.level === 'beginner',
+                    'bg-amber-500 text-white':  selectedExercise.level === 'intermediate',
+                    'bg-red-500 text-white':    selectedExercise.level === 'expert',
                   }"
                 >{{ levelLabel(selectedExercise.level) }}</span>
                 <button
@@ -242,6 +252,7 @@ const exLoading = ref(false)
 const search = ref('')
 const filterMuscle = ref('')
 const filterEquipment = ref('')
+const filterLevel = ref('')
 const selectedExercise = ref(null)
 const currentPage = ref(1)
 const PAGE_SIZE = 12
@@ -268,7 +279,8 @@ const filteredExercises = computed(() => {
     const matchSearch = !q || searchName.includes(q)
     const matchMuscle = !filterMuscle.value || e.muscle_group === filterMuscle.value
     const matchEquip  = !filterEquipment.value || e.equipment === filterEquipment.value
-    return matchSearch && matchMuscle && matchEquip
+    const matchLevel  = !filterLevel.value  || e.level === filterLevel.value
+    return matchSearch && matchMuscle && matchEquip && matchLevel
   })
 })
 
@@ -279,7 +291,7 @@ const paginatedExercises = computed(() => {
   return filteredExercises.value.slice(start, start + PAGE_SIZE)
 })
 
-watch([search, filterMuscle, filterEquipment], () => { currentPage.value = 1 })
+watch([search, filterMuscle, filterEquipment, filterLevel], () => { currentPage.value = 1 })
 
 function openModal(ex) {
   selectedExercise.value = ex
