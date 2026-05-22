@@ -38,20 +38,20 @@ def _copy_from_dataframe(conn, df, target):
 
 def truncate_all(engine):
     """Vide toutes les tables ETL avant chargement (idempotence par
-    re-création complète)."""
+    re-création complète). La table exercises est exclue — elle est gérée
+    séparément via upsert pour préserver les traductions FR."""
     tables = [
         "session_exercises",
         "food_logs",
         "biometric_metrics",
         "workout_sessions",
-        "exercises",
         "foods",
         "users",
     ]
     with engine.begin() as conn:
         for t in tables:
             conn.execute(text(f"TRUNCATE TABLE {t} RESTART IDENTITY CASCADE;"))
-    logger.info("toutes les tables ETL ont été tronquées.")
+    logger.info("toutes les tables ETL ont été tronquées (exercises préservée).")
 
 
 def insert(engine, df, table):
@@ -64,6 +64,59 @@ def insert(engine, df, table):
         n = _copy_from_dataframe(conn, df, table)
     logger.info(f"[{table}] {n} lignes insérées.")
     return n
+
+
+def upsert_exercises(engine, df):
+    """Upsert des exercices : met à jour les colonnes EN, préserve les
+    colonnes FR existantes (name_fr, type_fr, muscle_group_fr,
+    equipment_fr, level_fr, instructions_fr) si déjà renseignées.
+    Utilise une table temporaire + INSERT ... ON CONFLICT (name)."""
+    if df.empty:
+        logger.warning("[exercises] dataframe vide, ignoré.")
+        return 0
+
+    fr_cols = ["type_fr", "muscle_group_fr", "equipment_fr", "level_fr"]
+    en_cols = ["name", "type", "muscle_group", "equipment", "level",
+               "instructions", "gif_url", "video_url", "image_url"]
+    all_cols = en_cols + [c for c in fr_cols if c in df.columns]
+    df_insert = df[[c for c in all_cols if c in df.columns]].copy()
+
+    cols_sql = ", ".join(f'"{c}"' for c in df_insert.columns)
+    update_en = ", ".join(
+        f'"{c}" = EXCLUDED."{c}"'
+        for c in en_cols if c != "name" and c in df_insert.columns
+    )
+    # Pour les colonnes FR : on garde la valeur existante si elle est déjà
+    # renseignée, sinon on prend celle de l'ETL (issue des maps statiques).
+    update_fr = ", ".join(
+        f'"{c}" = COALESCE(exercises."{c}", EXCLUDED."{c}")'
+        for c in fr_cols if c in df_insert.columns
+    )
+    updates = ", ".join(filter(None, [update_en, update_fr]))
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TEMP TABLE exercises_staging
+            (LIKE exercises INCLUDING DEFAULTS)
+            ON COMMIT DROP
+        """))
+        raw_conn = conn.connection
+        buf = __import__("io").StringIO()
+        df_insert.to_csv(buf, index=False, header=False, na_rep="\\N")
+        buf.seek(0)
+        with raw_conn.cursor() as cur:
+            cur.copy_expert(
+                f"COPY exercises_staging ({cols_sql}) FROM STDIN WITH (FORMAT CSV, NULL '\\N')",
+                buf,
+            )
+        conn.execute(text(f"""
+            INSERT INTO exercises ({cols_sql})
+            SELECT {cols_sql} FROM exercises_staging
+            ON CONFLICT (name) DO UPDATE SET {updates}
+        """))
+
+    logger.info(f"[exercises] {len(df_insert)} lignes upsertées (FR préservé).")
+    return len(df_insert)
 
 
 def fetch_id_map(engine, table, key_col):

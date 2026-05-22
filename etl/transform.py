@@ -200,6 +200,58 @@ _LEVEL_MAP = {
     "advanced": "expert",
 }
 
+_LEVEL_FR_MAP = {
+    "beginner":     "débutant",
+    "intermediate": "intermédiaire",
+    "expert":       "expert",
+}
+
+_TYPE_FR_MAP = {
+    "cardio":           "cardio",
+    "olympic weightlifting": "haltérophilie olympique",
+    "plyometrics":      "pliométrie",
+    "powerlifting":     "force athlétique",
+    "strength":         "musculation",
+    "stretching":       "étirements",
+    "strongman":        "homme fort",
+}
+
+_MUSCLE_FR_MAP = {
+    "abdominals":       "abdominaux",
+    "abductors":        "abducteurs",
+    "adductors":        "adducteurs",
+    "biceps":           "biceps",
+    "calves":           "mollets",
+    "chest":            "poitrine",
+    "forearms":         "avant-bras",
+    "glutes":           "fessiers",
+    "hamstrings":       "ischio-jambiers",
+    "lats":             "dorsaux",
+    "lower back":       "bas du dos",
+    "middle back":      "milieu du dos",
+    "neck":             "cou",
+    "quadriceps":       "quadriceps",
+    "shoulders":        "épaules",
+    "traps":            "trapèzes",
+    "triceps":          "triceps",
+}
+
+_EQUIPMENT_FR_MAP = {
+    "barbell":          "barre",
+    "body only":        "poids du corps",
+    "bands":            "élastiques",
+    "cable":            "câble",
+    "dumbbell":         "haltères",
+    "e-z curl bar":     "barre curl ez",
+    "exercise ball":    "ballon de gym",
+    "foam roll":        "rouleau de massage",
+    "kettlebells":      "kettlebells",
+    "machine":          "machine",
+    "medicine ball":    "médecine-ball",
+    "other":            "autre",
+    "pullup bar":       "barre de traction",
+}
+
 
 def _build_image_url(images_value):
     """images est une liste de chemins relatifs ; on prend le premier."""
@@ -265,6 +317,7 @@ def transform_exercises(df):
     if "level" in df.columns:
         df["level"] = (df["level"].astype(str).str.strip().str.lower()
                        .map(_LEVEL_MAP))
+        df["level_fr"] = df["level"].map(_LEVEL_FR_MAP)
 
     if "primaryMuscles" in df.columns:
         df["muscle_group"] = df["primaryMuscles"].apply(
@@ -273,6 +326,7 @@ def transform_exercises(df):
         )
         if df["muscle_group"].notna().any():
             df["muscle_group"] = df["muscle_group"].astype(str).str.strip().str.lower()
+            df["muscle_group_fr"] = df["muscle_group"].map(_MUSCLE_FR_MAP)
 
     if "instructions" in df.columns:
         df["instructions"] = df["instructions"].apply(
@@ -280,7 +334,13 @@ def transform_exercises(df):
             else (str(v) if pd.notna(v) else "")
         )
 
-    keep = ["name", "type", "muscle_group", "equipment", "level", "instructions",
+    if "type" in df.columns:
+        df["type_fr"] = df["type"].map(_TYPE_FR_MAP)
+    if "equipment" in df.columns:
+        df["equipment_fr"] = df["equipment"].map(_EQUIPMENT_FR_MAP)
+
+    keep = ["name", "type", "type_fr", "muscle_group", "muscle_group_fr",
+            "equipment", "equipment_fr", "level", "level_fr", "instructions",
             "gif_url", "video_url", "image_url"]
     out = df[[c for c in keep if c in df.columns]].copy()
 
