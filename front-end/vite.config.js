@@ -8,7 +8,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'favicon-96x96.png', 'apple-touch-icon.png', 'logo-icon.png'],
+      includeAssets: ['favicon.png', 'favicon-96x96.png', 'apple-touch-icon.png', 'healthai-coach-icon-light-navbar.svg', 'healthai-coach-logo-light-navbar-text-subtitle-big.svg'],
       manifest: {
         name: 'HealthAI Coach',
         short_name: 'HealthAI',

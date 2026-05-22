@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-brand-light">
     <Navbar />
-    <main class="pt-16 pb-16 sm:pb-0">
+    <main class="pt-20 pb-16 sm:pt-16 sm:pb-0">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">

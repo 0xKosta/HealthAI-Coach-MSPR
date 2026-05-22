@@ -97,8 +97,8 @@ front-end/
 │   ├── apple-touch-icon.png     # Icône iOS (ajout écran d'accueil)
 │   ├── pwa-192x192.png          # Icône PWA manifest
 │   ├── pwa-512x512.png          # Icône PWA manifest (maskable)
-│   ├── logo-horizontal.png      # Logo complet (navbar desktop)
-│   └── logo-icon.png            # Icône seule (navbar mobile)
+│   ├── healthai-coach-logo-light-navbar-text-subtitle-big.svg  # Logo complet (navbar)
+│   └── healthai-coach-icon-light-navbar.svg        # Icône seule (navbar mobile)
 ├── src/
 │   ├── assets/
 │   │   └── main.css             # Tailwind + classes utilitaires globales

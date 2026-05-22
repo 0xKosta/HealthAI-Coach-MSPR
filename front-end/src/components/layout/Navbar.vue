@@ -2,22 +2,22 @@
   <!-- Navbar principale — fond #08104D (bleu nuit, zones structurantes) -->
   <nav class="fixed top-0 inset-x-0 z-50 bg-brand-primary border-b border-brand-secondary/50 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+      <div class="relative flex items-center h-20 sm:h-16 w-full">
 
-        <!-- Logo -->
-        <RouterLink to="/" class="flex items-center group">
-          <!-- Logo horizontal sur desktop — fond blanc arrondi -->
-          <div class="hidden sm:flex items-center bg-white rounded-xl px-3 py-1.5 group-hover:bg-slate-50 transition-colors shadow-sm">
-            <img src="/logo-horizontal.png" alt="HealthAI Coach" class="h-8 object-contain" />
-          </div>
-          <!-- Icône seule sur mobile — fond blanc arrondi -->
-          <div class="sm:hidden flex items-center justify-center bg-white rounded-xl p-1.5 group-hover:bg-slate-50 transition-colors shadow-sm">
-            <img src="/logo-icon.png" alt="HealthAI Coach" class="h-8 w-8 object-contain" />
-          </div>
+        <!-- Logo — centré mobile, à gauche desktop -->
+        <RouterLink
+          to="/"
+          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:static sm:translate-x-0 sm:translate-y-0 flex items-center"
+        >
+          <img
+            src="/healthai-coach-logo-light-navbar-text-subtitle-big.svg"
+            alt="HealthAI Coach"
+            class="h-[4.75rem] sm:h-16 max-w-[calc(100vw-4rem)] sm:max-w-none object-contain"
+          />
         </RouterLink>
 
         <!-- Liens desktop -->
-        <div class="hidden sm:flex items-center gap-2">
+        <div class="hidden sm:flex flex-1 items-center justify-center gap-2">
           <RouterLink
             v-for="link in navLinks"
             :key="link.to"
@@ -35,7 +35,7 @@
         </div>
 
         <!-- Indicateur statut -->
-        <div class="flex items-center gap-2 text-xs text-slate-400">
+        <div class="ml-auto flex items-center gap-2 text-xs text-slate-400 relative z-10">
           <span class="w-2 h-2 rounded-full bg-brand-success animate-pulse-slow"></span>
           <span class="hidden lg:block">API connectée</span>
         </div>
