@@ -1,4 +1,5 @@
 # tests/test_routes.py
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
@@ -274,3 +275,39 @@ def test_coach_biometric_trend_success(client, created_user, created_metric):
     assert response.status_code == 200
     data = response.json()
     assert "analysis" in data
+
+
+# PNG 1x1 valide (base64)
+VALID_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+def test_coach_analyze_photo_rejects_text_base64(client, created_user):
+    import base64
+
+    text_b64 = base64.b64encode(b"ceci nest pas une image").decode()
+    response = client.post("/coach/analyze-photo", json={
+        "user_id": created_user["id"],
+        "image_base64": text_b64,
+    })
+    assert response.status_code == 400
+    assert "image" in response.json()["detail"].lower()
+
+
+def test_coach_analyze_photo_success(client, created_user):
+    mock_resp = _mock_openai_response(json.dumps({
+        "foods_detected": ["salade"],
+        "macros": {"calories": 120, "protein_g": 5.0, "carbs_g": 10.0, "fat_g": 7.0},
+        "advice": "Repas équilibré.",
+    }))
+    with patch("api.routers.coach.client") as mock_client:
+        mock_client.chat.completions.create.return_value = mock_resp
+        response = client.post("/coach/analyze-photo", json={
+            "user_id": created_user["id"],
+            "image_base64": VALID_PNG_B64,
+        })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["foods_detected"] == ["salade"]
+    assert data["macros"]["calories"] == 120
