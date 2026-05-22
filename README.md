@@ -226,6 +226,12 @@ pytest tests/ --cov=api --cov-report=term-missing --cov-report=html
 
 Les tests utilisent une base **SQLite en mémoire** — aucun fichier `.env` requis, aucune connexion Supabase nécessaire. Les appels OpenAI sont mockés.
 
+Pour consulter le rapport HTML :
+1. Lancer la commande avec `--cov-report=html`
+2. Ouvrir `htmlcov/index.html` dans ton navigateur
+
+> Si `pytest-cov` n'est pas installé : `pip install pytest-cov`
+
 **Couverture actuelle : 73%** (20 tests — health, users, nutrition, exercises, metrics, coach)
 
 | Fichier | Couverture |
