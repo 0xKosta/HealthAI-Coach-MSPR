@@ -247,8 +247,7 @@ La table `exercises` embarque deux versions linguistiques pour chaque champ text
 les colonnes anglaises issues de la source ExerciseDB (`name`, `type`, `muscle_group`,
 `equipment`, `level`, `instructions`) et leurs equivalents francais
 (`name_fr`, `type_fr`, `muscle_group_fr`, `equipment_fr`, `level_fr`, `instructions_fr`)
-generes par traduction automatique via le script Python `translate_exercises_full.py`
-(bibliotheque `deep-translator`, moteur Google Translate).
+generes par traduction automatique (bibliotheque `deep-translator`, moteur Google Translate).
 
 L'API expose un parametre `?lang=en` (defaut) ou `?lang=fr` sur les endpoints
 `GET /exercises` et `GET /exercises/{id}`. Le front-end n'a qu'a passer ce parametre
