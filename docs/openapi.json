@@ -1769,6 +1769,48 @@
         }
       }
     },
+    "/coach/meal-plan": {
+      "post": {
+        "tags": [
+          "Coach IA"
+        ],
+        "summary": "Plan repas personnalisé avec contraintes",
+        "description": "Génère un plan repas hebdomadaire via GPT-4o-mini, adapté à l'objectif de l'utilisateur, à son budget et à ses allergies ou intolérances alimentaires.",
+        "operationId": "get_meal_plan_coach_meal_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MealPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/coach/biometric-trend": {
       "post": {
         "tags": [
@@ -2734,6 +2776,67 @@
           "fat_g"
         ],
         "title": "Macros"
+      },
+      "MealPlanRequest": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id",
+            "description": "Identifiant de l'utilisateur"
+          },
+          "budget_euros": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 10.0,
+            "title": "Budget Euros",
+            "description": "Budget hebdomadaire en euros (10–500)",
+            "default": 50.0
+          },
+          "allergies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergies",
+            "description": "Liste des allergies ou intolérances (ex: ['gluten', 'lactose'])"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "MealPlanRequest",
+        "example": {
+          "allergies": [
+            "gluten",
+            "lactose"
+          ],
+          "budget_euros": 50.0,
+          "user_id": 1
+        }
+      },
+      "MealPlanResponse": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "user_name",
+          "plan"
+        ],
+        "title": "MealPlanResponse"
       },
       "PhotoRequest": {
         "properties": {
