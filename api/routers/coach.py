@@ -14,6 +14,13 @@ from api.ai_client import client
 from api.database import get_db
 from api.models import User, BiometricMetric, WorkoutSession
 
+from api.coach_utils import (
+    advice_cache, workout_cache, trend_cache,
+    coach_limiter,
+    get_fallback_advice, FALLBACK_WORKOUT, FALLBACK_TREND,
+    TTLCache,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -128,7 +135,7 @@ class TrendResponse(BaseModel):
 
 
 # =============================================================================
-# ENDPOINT — POST /coach/advice  (existant, inchangé)
+# ENDPOINT — POST /coach/advice
 # =============================================================================
 
 @router.post(
@@ -143,15 +150,29 @@ class TrendResponse(BaseModel):
 def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
 
+    # — Rate limiting —
+    if not coach_limiter.is_allowed(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Quota atteint : 10 appels IA par heure. "
+                   f"Réessayez dans quelques minutes.",
+        )
+
+    # — Cache —
+    cache_key = TTLCache.make_key(endpoint="advice", user_id=user.id)
+    cached = advice_cache.get(cache_key)
+    if cached:
+        logger.info("Cache hit — /coach/advice user_id=%s", user.id)
+        return CoachResponse(user_id=user.id, user_name=user.name, advice=cached)
+
+    # — Construction du prompt (inchangée) —
     last_metric = (
         db.query(BiometricMetric)
         .filter(BiometricMetric.user_id == user.id)
         .order_by(BiometricMetric.record_date.desc())
         .first()
     )
-
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
-
     metric_context = ""
     if last_metric:
         parts = []
@@ -163,8 +184,7 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
             parts.append(f"fréquence cardiaque au repos {last_metric.resting_bpm:.0f} bpm")
         if parts:
             metric_context = " Dernières données biométriques : " + ", ".join(parts) + "."
-
-    bmi_context = f", un IMC de {user.bmi:.1f}" if user.bmi else ""
+    bmi_context = f", un IMC de {user.bmi:.1f}" if user.bmi is not None else ""
     prompt = (
         f"Tu es un coach santé bienveillant et expert. "
         f"L'utilisateur s'appelle {user.name}, il a {user.age} ans{bmi_context}, "
@@ -173,6 +193,7 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
         f"en 3 à 5 phrases maximum."
     )
 
+    # — Appel OpenAI avec fallback —
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -180,9 +201,10 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
             max_tokens=300,
         )
         advice_text = response.choices[0].message.content
+        advice_cache.set(cache_key, advice_text)  # mise en cache
     except Exception as exc:
         logger.error("Erreur OpenAI /advice : %s", exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+        advice_text = get_fallback_advice(user.goal)  # fallback au lieu de 502
 
     return CoachResponse(user_id=user.id, user_name=user.name, advice=advice_text)
 
@@ -294,10 +316,26 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
 )
 def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
+
+    if not coach_limiter.is_allowed(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quota atteint : 10 appels IA par heure.",
+        )
+
+    cache_key = TTLCache.make_key(
+        endpoint="workout",
+        user_id=user.id,
+        equipment=payload.equipment,
+        days=payload.days_per_week,
+    )
+    cached = workout_cache.get(cache_key)
+    if cached:
+        logger.info("Cache hit — /coach/workout-plan user_id=%s", user.id)
+        return WorkoutResponse(user_id=user.id, user_name=user.name, plan=cached)
+
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
     equipment_fr = EQUIPMENT_LABELS.get(payload.equipment, payload.equipment)
-
-    # Contexte biométrique pour affiner le programme
     last_metric = (
         db.query(BiometricMetric)
         .filter(BiometricMetric.user_id == user.id)
@@ -313,18 +351,14 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
             parts.append(f"FC repos {last_metric.resting_bpm:.0f} bpm")
         if parts:
             bio_context = " Données récentes : " + ", ".join(parts) + "."
-
-    bmi_context = f", IMC {user.bmi:.1f}" if user.bmi else ""
-
+    bmi_context = f", IMC {user.bmi:.1f}" if user.bmi is not None else ""
     prompt = (
         f"Tu es un coach sportif expert. "
         f"Génère un programme d'entraînement hebdomadaire en français, formaté en Markdown. "
         f"Profil : {user.name}, {user.age} ans{bmi_context}, objectif {goal_fr}.{bio_context} "
         f"Matériel disponible : {equipment_fr}. "
         f"Nombre de séances par semaine : {payload.days_per_week}. "
-        f"Le programme doit inclure : les jours d'entraînement, les exercices avec séries/répétitions, "
-        f"les temps de repos, et un conseil de récupération. "
-        f"Sois précis, structuré et motivant."
+        f"Inclure : jours, exercices avec séries/répétitions, temps de repos, conseil récupération."
     )
 
     try:
@@ -334,9 +368,10 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
             max_tokens=800,
         )
         plan_text = response.choices[0].message.content
+        workout_cache.set(cache_key, plan_text)
     except Exception as exc:
         logger.error("Erreur OpenAI /workout-plan : %s", exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+        plan_text = FALLBACK_WORKOUT
 
     return WorkoutResponse(user_id=user.id, user_name=user.name, plan=plan_text)
 
@@ -357,9 +392,19 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
 )
 def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
-    goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
 
-    # Fenêtre glissante : 30 derniers jours
+    if not coach_limiter.is_allowed(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quota atteint : 10 appels IA par heure.",
+        )
+
+    cache_key = TTLCache.make_key(endpoint="trend", user_id=user.id)
+    cached = trend_cache.get(cache_key)
+    if cached:
+        logger.info("Cache hit — /coach/biometric-trend user_id=%s", user.id)
+        return TrendResponse(user_id=user.id, user_name=user.name, analysis=cached)
+
     since = date.today() - timedelta(days=30)
     metrics = (
         db.query(BiometricMetric)
@@ -370,14 +415,13 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
         .order_by(BiometricMetric.record_date.asc())
         .all()
     )
-
     if not metrics:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucune donnée biométrique sur les 30 derniers jours pour cet utilisateur.",
+            detail="Aucune donnée biométrique sur les 30 derniers jours.",
         )
 
-    # Sérialisation des données pour le prompt
+    goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
     data_lines = []
     for m in metrics:
         parts = [f"Date: {m.record_date}"]
@@ -389,16 +433,12 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
             parts.append(f"FC_repos={m.resting_bpm:.0f}bpm")
         data_lines.append(" | ".join(parts))
 
-    data_block = "\n".join(data_lines)
-
     prompt = (
-        f"Tu es un coach santé expert en analyse de données. "
-        f"Voici les données biométriques des 30 derniers jours de {user.name} "
-        f"(objectif : {goal_fr}) :\n\n"
-        f"{data_block}\n\n"
-        f"Analyse ces tendances en français : identifie les évolutions positives, "
-        f"les points d'attention et donne 2 à 3 conseils concrets adaptés à son objectif. "
-        f"Formatage Markdown accepté. Maximum 200 mots."
+        f"Tu es un coach santé expert. "
+        f"Données biométriques 30 jours de {user.name} (objectif : {goal_fr}) :\n\n"
+        f"{chr(10).join(data_lines)}\n\n"
+        f"Analyse les tendances, identifie les évolutions positives et points d'attention, "
+        f"donne 2–3 conseils concrets. Markdown accepté. 200 mots max."
     )
 
     try:
@@ -408,8 +448,9 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
             max_tokens=400,
         )
         analysis_text = response.choices[0].message.content
+        trend_cache.set(cache_key, analysis_text)
     except Exception as exc:
         logger.error("Erreur OpenAI /biometric-trend : %s", exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+        analysis_text = FALLBACK_TREND
 
     return TrendResponse(user_id=user.id, user_name=user.name, analysis=analysis_text)
