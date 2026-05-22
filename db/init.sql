@@ -99,6 +99,8 @@ CREATE TABLE exercises (
     image_url         TEXT
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS exercises_name_uq ON exercises (name);
+
 COMMENT ON TABLE  exercises                  IS 'Catalogue d''exercices — source : ExerciseDB (GitHub, format JSON)';
 COMMENT ON COLUMN exercises.name_fr          IS 'Nom de l''exercice traduit en français';
 COMMENT ON COLUMN exercises.type_fr          IS 'Type d''exercice traduit en français';

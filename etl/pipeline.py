@@ -22,7 +22,7 @@ def setup_logging():
 def run_exercises(engine):
     df = extract.extract_exercises()
     df_clean, rep = transform.transform_exercises(df)
-    load.insert(engine, df_clean, config.TBL_EXERCISES)
+    load.upsert_exercises(engine, df_clean)
     return rep
 
 
