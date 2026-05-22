@@ -21,14 +21,18 @@ router = APIRouter()
     "/",
     response_model=list[BiometricMetricResponse],
     summary="Lister les mesures biométriques",
-    description="Retourne la liste paginée de toutes les mesures biométriques enregistrées.",
+    description="Retourne les mesures biométriques. Filtrage optionnel par user_id.",
 )
 def list_metrics(
+    user_id: int | None = Query(None, description="Filtrer par utilisateur"),
     skip: int = Query(0, ge=0, description="Nombre d'entrées à ignorer"),
-    limit: int = Query(100, ge=1, le=1000, description="Nombre maximum d'entrées à retourner"),
+    limit: int = Query(100, ge=1, le=10000, description="Nombre maximum d'entrées à retourner"),
     db: Session = Depends(get_db),
 ):
-    return db.query(BiometricMetric).offset(skip).limit(limit).all()
+    q = db.query(BiometricMetric)
+    if user_id is not None:
+        q = q.filter(BiometricMetric.user_id == user_id)
+    return q.offset(skip).limit(limit).all()
 
 
 @router.get(

@@ -21,7 +21,7 @@ export const exercisesAPI = {
 }
 
 export const metricsAPI = {
-  getAll: () => api.get('/metrics/')
+  getByUser: (userId) => api.get(`/metrics/?user_id=${userId}`)
 }
 
 export const coachAPI = {

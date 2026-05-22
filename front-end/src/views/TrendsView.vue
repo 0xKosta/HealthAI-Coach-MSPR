@@ -122,7 +122,7 @@ const trendError = ref('')
 
 const userMetrics = computed(() =>
   allMetrics.value
-    .filter(m => m.user_id === userStore.selectedUserId)
+    .slice()
     .sort((a, b) => new Date(a.record_date) - new Date(b.record_date))
     .slice(-30)
 )
@@ -185,8 +185,9 @@ const sleepBpmSeries = computed(() => [
 ])
 
 async function loadMetrics() {
+  if (!userStore.selectedUserId) return
   metricsLoading.value = true; metricsError.value = ''
-  try { const res = await metricsAPI.getAll(); allMetrics.value = res.data }
+  try { const res = await metricsAPI.getByUser(userStore.selectedUserId); allMetrics.value = res.data }
   catch { metricsError.value = 'Impossible de charger les métriques biométriques.' }
   finally { metricsLoading.value = false }
 }
@@ -204,6 +205,6 @@ async function fetchTrendAnalysis() {
   }
 }
 
-watch(() => userStore.selectedUserId, () => { trendAnalysis.value = ''; trendError.value = '' })
+watch(() => userStore.selectedUserId, () => { trendAnalysis.value = ''; trendError.value = ''; loadMetrics() })
 onMounted(() => loadMetrics())
 </script>
