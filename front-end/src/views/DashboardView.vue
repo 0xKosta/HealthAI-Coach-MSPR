@@ -5,7 +5,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Dashboard</h1>
-        <p class="text-slate-500 mt-1">Vue d'ensemble de votre santé personnalisée</p>
+        <p class="text-slate-600 mt-1">Vue d'ensemble de votre santé personnalisée</p>
       </div>
       <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
     </div>
@@ -33,25 +33,25 @@
           <div class="grid grid-cols-2 gap-3">
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
               <p class="text-2xl font-bold text-brand-primary">{{ user.age }}</p>
-              <p class="text-xs text-slate-400">ans</p>
+              <p class="text-xs text-slate-600">ans</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
               <p class="text-2xl font-bold" :class="bmiColor">{{ user.bmi?.toFixed(1) }}</p>
-              <p class="text-xs text-slate-400">IMC</p>
+              <p class="text-xs text-slate-600">IMC</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
               <p class="text-2xl font-bold text-brand-primary">{{ user.weight_kg }} kg</p>
-              <p class="text-xs text-slate-400">Poids</p>
+              <p class="text-xs text-slate-600">Poids</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
               <p class="text-2xl font-bold text-brand-primary">{{ (user.height_cm / 100).toFixed(2) }} m</p>
-              <p class="text-xs text-slate-400">Taille</p>
+              <p class="text-xs text-slate-600">Taille</p>
             </div>
           </div>
 
           <div v-if="user.body_fat_pct" class="mt-3 bg-white rounded-xl p-3 border border-slate-100">
             <div class="flex justify-between mb-1.5">
-              <span class="text-xs text-slate-500">Masse grasse</span>
+              <span class="text-xs text-slate-600">Masse grasse</span>
               <span class="text-xs font-semibold text-brand-secondary">{{ user.body_fat_pct?.toFixed(1) }}%</span>
             </div>
             <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -103,10 +103,10 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 class="text-xl font-bold text-brand-primary">Conseil personnalisé</h2>
-            <p class="text-sm text-slate-500 mt-0.5">Analyse IA basée sur votre profil complet</p>
+            <p class="text-sm text-slate-600 mt-0.5">Analyse IA basée sur votre profil complet</p>
           </div>
           <button @click="fetchAdvice" :disabled="adviceLoading" class="btn-primary">
-            <div v-if="adviceLoading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <div v-if="adviceLoading" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
             <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
             </svg>
@@ -123,7 +123,7 @@
               <path d="M12 2a10 10 0 1 0 10 10"/><circle cx="18" cy="6" r="3" fill="currentColor"/>
             </svg>
           </div>
-          <p class="text-slate-400 text-sm">Cliquez sur le bouton pour recevoir un conseil personnalisé</p>
+          <p class="text-slate-600 text-sm">Cliquez sur le bouton pour recevoir un conseil personnalisé</p>
         </div>
 
         <!-- Carte IA — fond bleu nuit #08104D (zone structurante) -->

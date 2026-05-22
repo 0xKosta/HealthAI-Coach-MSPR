@@ -1,8 +1,9 @@
 <template>
   <div class="flex items-center gap-3">
-    <label class="label mb-0 whitespace-nowrap text-slate-600">Utilisateur :</label>
+    <label for="user-select" class="label mb-0 whitespace-nowrap text-slate-600">Utilisateur :</label>
     <div class="relative">
       <select
+        id="user-select"
         :value="modelValue"
         @change="$emit('update:modelValue', Number($event.target.value))"
         class="select pr-10 min-w-[200px] appearance-none"

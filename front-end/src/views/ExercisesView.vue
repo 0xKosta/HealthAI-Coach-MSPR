@@ -5,7 +5,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Catalogue d'exercices</h1>
-        <p class="text-slate-500 mt-1">Explorez et filtrez la bibliothèque complète d'exercices</p>
+        <p class="text-slate-600 mt-1">Explorez et filtrez la bibliothèque complète d'exercices</p>
       </div>
     </div>
 
@@ -13,7 +13,7 @@
     <div class="card">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
-          <p class="text-sm text-slate-500">{{ filteredExercises.length }} exercices disponibles</p>
+          <p class="text-sm text-slate-600">{{ filteredExercises.length }} exercices disponibles</p>
         </div>
         <div class="flex items-center gap-3">
           <LoadingSpinner v-if="exLoading" message="" />
@@ -112,7 +112,7 @@
                 {{ exMuscleLabel(ex) }}
               </span>
               <span v-if="ex.equipment" class="badge-accent text-[11px]">{{ exEquipLabel(ex) }}</span>
-              <span v-if="ex.type" class="bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-0.5 rounded-full">{{ exTypeLabel(ex) }}</span>
+              <span v-if="ex.type" class="bg-slate-100 text-slate-600 text-[11px] font-medium px-2 py-0.5 rounded-full">{{ exTypeLabel(ex) }}</span>
             </div>
           </div>
         </div>
@@ -223,7 +223,7 @@
         <svg class="w-10 h-10 text-slate-300 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
         </svg>
-        <p class="text-slate-400">{{ lang === 'fr' ? 'Aucun exercice ne correspond aux filtres' : 'No exercises match the filters' }}</p>
+        <p class="text-slate-600">{{ lang === 'fr' ? 'Aucun exercice ne correspond aux filtres' : 'No exercises match the filters' }}</p>
       </div>
 
       <!-- Pagination -->
@@ -231,7 +231,7 @@
         <button @click="currentPage--" :disabled="currentPage === 1" class="btn-secondary px-3 py-1.5 text-sm disabled:opacity-40">
           ← {{ lang === 'fr' ? 'Précédent' : 'Previous' }}
         </button>
-        <span class="text-sm text-slate-500">Page {{ currentPage }} / {{ totalPages }}</span>
+        <span class="text-sm text-slate-600">Page {{ currentPage }} / {{ totalPages }}</span>
         <button @click="currentPage++" :disabled="currentPage === totalPages" class="btn-secondary px-3 py-1.5 text-sm disabled:opacity-40">
           {{ lang === 'fr' ? 'Suivant' : 'Next' }} →
         </button>

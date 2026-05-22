@@ -7,9 +7,9 @@
            v-html="icon" />
     </div>
     <div>
-      <p class="text-xs font-medium text-slate-500">{{ label }}</p>
+      <p class="text-xs font-medium text-slate-600">{{ label }}</p>
       <p class="text-xl font-bold text-brand-primary">{{ value }}</p>
-      <p v-if="sub" class="text-xs text-slate-400">{{ sub }}</p>
+      <p v-if="sub" class="text-xs text-slate-600">{{ sub }}</p>
     </div>
   </div>
 </template>

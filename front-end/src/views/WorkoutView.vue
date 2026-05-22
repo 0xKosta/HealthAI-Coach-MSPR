@@ -5,7 +5,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Programme d'Entraînement</h1>
-        <p class="text-slate-500 mt-1">Générez un plan IA personnalisé selon votre profil et vos objectifs</p>
+        <p class="text-slate-600 mt-1">Générez un plan IA personnalisé selon votre profil et vos objectifs</p>
       </div>
       <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
     </div>
@@ -22,7 +22,7 @@
               @click="form.equipment = eq.value"
               class="flex items-center gap-2.5 px-3 py-3 rounded-xl border text-sm font-medium transition-all duration-200"
               :class="form.equipment === eq.value
-                ? 'bg-brand-accent text-white border-brand-accent shadow-sm'
+                ? 'bg-brand-accent text-brand-primary border-brand-accent shadow-sm'
                 : 'border-slate-200 text-slate-600 bg-white hover:border-brand-accent/40 hover:text-brand-primary'"
             >
               <span class="material-symbols-outlined text-[20px] leading-none">{{ eq.icon }}</span>
@@ -42,16 +42,16 @@
                 : 'border-slate-200 text-slate-600 bg-white hover:border-brand-primary/40'"
             >{{ d }}</button>
           </div>
-          <p class="text-xs text-slate-400 mt-2">{{ daysLabel }}</p>
+          <p class="text-xs text-slate-600 mt-2">{{ daysLabel }}</p>
         </div>
       </div>
       <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-4">
-        <p class="text-sm text-slate-500">
+        <p class="text-sm text-slate-600">
           <span class="font-medium text-brand-primary">{{ userStore.selectedUser?.name }}</span>
           · {{ goalLabels[userStore.selectedUser?.goal] }} · {{ form.daysPerWeek }}j/semaine
         </p>
         <button @click="generatePlan" :disabled="generating" class="btn-primary">
-          <div v-if="generating" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <div v-if="generating" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
           <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <polygon points="5 3 19 12 5 21 5 3"/>
           </svg>
@@ -67,7 +67,7 @@
       <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="text-xl font-bold text-brand-primary">Votre programme</h2>
-          <p class="text-sm text-slate-500 mt-0.5">{{ plan.user_name }} · {{ form.daysPerWeek }} jours/semaine</p>
+          <p class="text-sm text-slate-600 mt-0.5">{{ plan.user_name }} · {{ form.daysPerWeek }} jours/semaine</p>
         </div>
         <button @click="generatePlan" class="btn-secondary text-xs">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
