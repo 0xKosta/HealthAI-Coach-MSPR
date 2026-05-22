@@ -4,7 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Analyse Nutritionnelle</h1>
-        <p class="text-slate-500 mt-1">Analysez un repas par photo grâce à l'IA vision</p>
+        <p class="text-slate-600 mt-1">Analysez un repas par photo grâce à l'IA vision</p>
       </div>
       <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
     </div>
@@ -33,7 +33,7 @@
             </svg>
           </div>
           <p class="text-brand-text font-medium">Glissez une image ici ou cliquez pour parcourir</p>
-          <p class="text-slate-400 text-sm mt-1">JPG, PNG, WebP — max 10 Mo</p>
+          <p class="text-slate-600 text-sm mt-1">JPG, PNG, WebP — max 10 Mo</p>
         </div>
 
         <div v-else class="relative">
@@ -46,7 +46,7 @@
 
       <div class="flex flex-col sm:flex-row gap-3 mt-4">
         <button @click="analyzePhoto" :disabled="!previewUrl || analyzing || !userStore.selectedUserId" class="btn-primary flex-1">
-          <div v-if="analyzing" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <div v-if="analyzing" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
           <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
@@ -76,7 +76,7 @@
             {{ food }}
           </span>
         </div>
-        <p v-else class="text-slate-400 text-sm">Aucun aliment identifié.</p>
+        <p v-else class="text-slate-600 text-sm">Aucun aliment identifié.</p>
 
         <!-- Macros -->
         <div v-if="result.macros" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -147,7 +147,7 @@ const MacroCard = defineComponent({
   setup(props) {
     return () => h('div', { class: `rounded-xl p-4 text-center border border-slate-100 ${props.bg}` }, [
       h('p', { class: `text-2xl font-bold ${props.color}` }, props.value ?? '—'),
-      h('p', { class: 'text-xs text-slate-500 mt-0.5' }, `${props.label} (${props.unit})`),
+      h('p', { class: 'text-xs text-slate-600 mt-0.5' }, `${props.label} (${props.unit})`),
     ])
   },
 })

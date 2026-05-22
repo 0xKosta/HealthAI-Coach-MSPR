@@ -16,6 +16,7 @@ Elle consomme l'API FastAPI disponible sur `http://localhost:8000`.
 | Vue Router | ^4.3 | Routage client (SPA) |
 | ApexCharts | ^5.10 | Graphiques biométriques |
 | Axios | ^1.6 | Appels HTTP vers l'API |
+| vite-plugin-pwa | ^1.3 | Service Worker + manifest (PWA) |
 | Google Material Symbols | CDN | Icônes d'interface |
 
 ---
@@ -36,20 +37,53 @@ cd front-end
 npm install
 ```
 
-## Lancer le serveur de développement
+---
+
+## Commandes disponibles
+
+| Commande | Description |
+|---|---|
+| `npm run dev` | Serveur de développement — `http://localhost:3000` |
+| `npm run build` | Build de production (génère `dist/`) |
+| `npm run preview` | Prévisualise le build de prod — `http://localhost:4173` |
+
+> **Important :** le Service Worker PWA est **désactivé en mode `dev`** par conception (Vite).  
+> Pour tester la PWA (installation, cache offline), utiliser `npm run build && npm run preview`.
+
+---
+
+## PWA — Progressive Web App
+
+L'application est une PWA complète, installable sur desktop et mobile.
+
+### Ce qui est en place
+
+| Élément | Détail |
+|---|---|
+| Manifest | Nom, short name, description, icônes, `display: standalone`, `theme_color` |
+| Service Worker | Généré par Workbox via `vite-plugin-pwa` |
+| Cache statique | HTML, CSS, JS, images — précachés au premier chargement |
+| Cache API | Stratégie `NetworkFirst` sur `/api/` (TTL 5 min, 50 entrées max) |
+| Icônes | 192×192 et 512×512 (générées via [realfavicongenerator.net](https://realfavicongenerator.net)) |
+| Support iOS | `apple-touch-icon`, balises meta `apple-mobile-web-app-*` |
+
+### Tester la PWA
 
 ```bash
-npm run dev
+npm run build && npm run preview
 ```
 
-L'application est disponible sur **http://localhost:3000**
+Ensuite dans Chrome DevTools → **Application** :
+- **Manifest** : vérifier nom, icônes, `display: standalone`
+- **Service Workers** : doit afficher `activated and running`
+- **Cache Storage** : liste les fichiers précachés
 
-## Build de production
+Le bouton d'installation apparaît dans la barre d'adresse Chrome une fois la PWA valide.
 
-```bash
-npm run build       # génère le dossier dist/
-npm run preview     # prévisualise le build
-```
+### Fonctionnement en production
+
+Le build est à effectuer **une seule fois** par déploiement (ou à chaque modification du code).  
+Le Service Worker persiste dans le navigateur et gère le cache automatiquement — aucune commande à relancer côté utilisateur.
 
 ---
 
@@ -58,7 +92,11 @@ npm run preview     # prévisualise le build
 ```
 front-end/
 ├── public/
-│   ├── favicon.png              # Favicon (icône HealthAI Coach)
+│   ├── favicon.png              # Favicon navigateur
+│   ├── favicon-96x96.png        # Favicon haute résolution
+│   ├── apple-touch-icon.png     # Icône iOS (ajout écran d'accueil)
+│   ├── pwa-192x192.png          # Icône PWA manifest
+│   ├── pwa-512x512.png          # Icône PWA manifest (maskable)
 │   ├── logo-horizontal.png      # Logo complet (navbar desktop)
 │   └── logo-icon.png            # Icône seule (navbar mobile)
 ├── src/
@@ -74,7 +112,7 @@ front-end/
 │   │       ├── StatCard.vue     # Carte indicateur chiffré
 │   │       └── UserSelector.vue # Dropdown sélection utilisateur
 │   ├── router/
-│   │   └── index.js             # Déclaration des 4 routes
+│   │   └── index.js             # Déclaration des routes
 │   ├── services/
 │   │   └── api.js               # Tous les appels axios (users, coach, metrics…)
 │   ├── stores/
@@ -83,13 +121,14 @@ front-end/
 │   │   ├── DashboardView.vue    # Page principale — profil + conseil IA
 │   │   ├── NutritionView.vue    # Analyse photo repas (vision IA)
 │   │   ├── WorkoutView.vue      # Génération programme d'entraînement
+│   │   ├── ExercisesView.vue    # Catalogue d'exercices
 │   │   └── TrendsView.vue       # Graphiques biométriques + tendances IA
 │   ├── App.vue                  # Composant racine + layout
 │   └── main.js                  # Point d'entrée (Pinia, Router, ApexCharts)
 ├── index.html
 ├── package.json
 ├── tailwind.config.js           # Palette charte graphique HealthAI Coach
-├── vite.config.js
+├── vite.config.js               # Config Vite + plugin PWA
 └── postcss.config.js
 ```
 
@@ -114,6 +153,9 @@ front-end/
 - Sélection du nombre de jours par semaine (1 à 7)
 - Génération via `POST /coach/workout-plan`
 - Affichage du programme formaté
+
+### `/exercises` — Catalogue d'exercices
+- Consultation du catalogue complet via `GET /exercises`
 
 ### `/trends` — Tendances biométriques
 - KPIs : poids actuel, sommeil moyen, BPM repos, nombre d'entrées
@@ -150,12 +192,13 @@ Typographie : **Inter** (400 / 600 / 700) — chargée via Google Fonts.
 | `GET` | `/users/` | Toutes (sélecteur) |
 | `GET` | `/users/{id}` | Dashboard |
 | `GET` | `/metrics/` | Trends |
+| `GET` | `/exercises/` | Exercises |
 | `POST` | `/coach/advice` | Dashboard |
 | `POST` | `/coach/analyze-photo` | Nutrition |
 | `POST` | `/coach/workout-plan` | Workout |
 | `POST` | `/coach/biometric-trend` | Trends |
 
-> Le CORS est configuré côté backend pour accepter `http://localhost:3000`.
+> Le CORS est configuré côté backend pour accepter `http://localhost:3000` et `http://localhost:4173` (preview).
 
 ---
 

@@ -4,7 +4,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Tendances Biométriques</h1>
-        <p class="text-slate-500 mt-1">Évolution de vos données de santé sur 30 jours</p>
+        <p class="text-slate-600 mt-1">Évolution de vos données de santé sur 30 jours</p>
       </div>
       <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
     </div>
@@ -46,12 +46,12 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="card">
           <h3 class="text-lg font-semibold text-brand-primary mb-1">Évolution du poids</h3>
-          <p class="text-xs text-slate-400 mb-4">Poids en kg sur les 30 derniers jours</p>
+          <p class="text-xs text-slate-600 mb-4">Poids en kg sur les 30 derniers jours</p>
           <apexchart type="area" height="220" :options="weightChartOptions" :series="weightSeries" />
         </div>
         <div class="card">
           <h3 class="text-lg font-semibold text-brand-primary mb-1">Sommeil & BPM repos</h3>
-          <p class="text-xs text-slate-400 mb-4">Heures de sommeil et fréquence cardiaque au repos</p>
+          <p class="text-xs text-slate-600 mb-4">Heures de sommeil et fréquence cardiaque au repos</p>
           <apexchart type="line" height="220" :options="sleepBpmChartOptions" :series="sleepBpmSeries" />
         </div>
       </div>
@@ -61,10 +61,10 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 class="text-xl font-bold text-brand-primary">Analyse des tendances</h2>
-            <p class="text-sm text-slate-500 mt-0.5">Interprétation IA de l'évolution sur 30 jours</p>
+            <p class="text-sm text-slate-600 mt-0.5">Interprétation IA de l'évolution sur 30 jours</p>
           </div>
           <button @click="fetchTrendAnalysis" :disabled="trendLoading" class="btn-primary">
-            <div v-if="trendLoading" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <div v-if="trendLoading" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
             <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
             </svg>
@@ -81,7 +81,7 @@
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
           </div>
-          <p class="text-slate-400 text-sm">Cliquez pour obtenir une analyse détaillée de vos tendances</p>
+          <p class="text-slate-600 text-sm">Cliquez pour obtenir une analyse détaillée de vos tendances</p>
         </div>
 
         <AIAdviceCard v-if="trendAnalysis" title="Analyse des tendances" :content="trendAnalysis" />
@@ -97,7 +97,7 @@
         </svg>
       </div>
       <p class="text-brand-secondary font-medium">Aucune donnée biométrique disponible</p>
-      <p class="text-slate-400 text-sm mt-1">Sélectionnez un autre utilisateur ou importez des métriques</p>
+      <p class="text-slate-600 text-sm mt-1">Sélectionnez un autre utilisateur ou importez des métriques</p>
     </div>
   </div>
 </template>

@@ -4,7 +4,7 @@
       <div class="absolute inset-0 rounded-full border-2 border-slate-200"></div>
       <div class="absolute inset-0 rounded-full border-2 border-t-brand-accent animate-spin"></div>
     </div>
-    <p v-if="message" class="text-sm text-slate-500">{{ message }}</p>
+    <p v-if="message" class="text-sm text-slate-600">{{ message }}</p>
   </div>
 </template>
 
