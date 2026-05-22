@@ -151,3 +151,16 @@ FALLBACK_TREND = (
 def get_fallback_advice(goal: Optional[str]) -> str:
     """Retourne le fallback adapté à l'objectif, ou le fallback maintenance par défaut."""
     return _FALLBACK_ADVICE.get(goal or "", _FALLBACK_ADVICE["maintenance"])
+
+# Cache pour meal-plan
+meal_cache = TTLCache(ttl_seconds=3600)  # 1h
+
+FALLBACK_MEAL = (
+    "Le service de génération de plan repas est temporairement indisponible.\n\n"
+    "Plan de remplacement général (environ 1800 kcal/j) :\n\n"
+    "**Petit-déjeuner** : flocons d'avoine + fruits + yaourt nature\n"
+    "**Déjeuner** : protéine maigre (poulet/poisson) + légumes + féculent complet\n"
+    "**Dîner** : soupe de légumes + œufs ou légumineuses + pain complet\n"
+    "**Collation** : poignée de fruits secs + fruit frais\n\n"
+    "*Adaptez les portions à votre objectif.*"
+)

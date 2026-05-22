@@ -18,7 +18,7 @@ from api.coach_utils import (
     advice_cache, workout_cache, trend_cache,
     coach_limiter,
     get_fallback_advice, FALLBACK_WORKOUT, FALLBACK_TREND,
-    TTLCache,
+    TTLCache, meal_cache, FALLBACK_MEAL
 )
 
 logger = logging.getLogger(__name__)
@@ -134,6 +134,37 @@ class TrendResponse(BaseModel):
     analysis: str
 
 
+# ── Plan repas ────────────────────────────────────────────────────────────────
+
+class MealPlanRequest(BaseModel):
+    user_id: int = Field(..., description="Identifiant de l'utilisateur")
+    budget_euros: float = Field(
+        50.0,
+        ge=10,
+        le=500,
+        description="Budget hebdomadaire en euros (10–500)",
+    )
+    allergies: list[str] = Field(
+        default_factory=list,
+        description="Liste des allergies ou intolérances (ex: ['gluten', 'lactose'])",
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": 1,
+                "budget_euros": 50.0,
+                "allergies": ["gluten", "lactose"],
+            }
+        }
+
+
+class MealPlanResponse(BaseModel):
+    user_id: int
+    user_name: str
+    plan: str
+
+
 # =============================================================================
 # ENDPOINT — POST /coach/advice
 # =============================================================================
@@ -200,7 +231,7 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
         )
-        advice_text = response.choices[0].message.content
+        advice_text = response.choices[0].message.content or get_fallback_advice(user.goal)
         advice_cache.set(cache_key, advice_text)  # mise en cache
     except Exception as exc:
         logger.error("Erreur OpenAI /advice : %s", exc, exc_info=True)
@@ -367,13 +398,84 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=800,
         )
-        plan_text = response.choices[0].message.content
+        plan_text = response.choices[0].message.content or FALLBACK_WORKOUT
         workout_cache.set(cache_key, plan_text)
     except Exception as exc:
         logger.error("Erreur OpenAI /workout-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_WORKOUT
 
     return WorkoutResponse(user_id=user.id, user_name=user.name, plan=plan_text)
+
+
+# =============================================================================
+# ENDPOINT — POST /coach/meal-plan
+# =============================================================================
+
+@router.post(
+    "/meal-plan",
+    response_model=MealPlanResponse,
+    summary="Plan repas personnalisé avec contraintes",
+    description=(
+        "Génère un plan repas hebdomadaire via GPT-4o-mini, "
+        "adapté à l'objectif de l'utilisateur, à son budget "
+        "et à ses allergies ou intolérances alimentaires."
+    ),
+)
+def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
+    user = _get_user_or_404(payload.user_id, db)
+
+    # — Rate limiting —
+    if not coach_limiter.is_allowed(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quota atteint : 10 appels IA par heure.",
+        )
+
+    # — Cache — clé inclut le budget et les allergies pour que
+    # deux requêtes avec des contraintes différentes ne partagent pas le même cache
+    cache_key = TTLCache.make_key(
+        endpoint="meal",
+        user_id=user.id,
+        budget=payload.budget_euros,
+        allergies=sorted(payload.allergies),  # sorted pour que ["gluten","lactose"]
+    )                                          # == ["lactose","gluten"] → même clé
+    cached = meal_cache.get(cache_key)
+    if cached:
+        logger.info("Cache hit — /coach/meal-plan user_id=%s", user.id)
+        return MealPlanResponse(user_id=user.id, user_name=user.name, plan=cached)
+
+    # — Contexte utilisateur —
+    goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
+    bmi_context = f", IMC {user.bmi:.1f}" if user.bmi is not None else ""
+
+    allergies_fr = (
+        ", ".join(payload.allergies) if payload.allergies else "aucune allergie connue"
+    )
+
+    prompt = (
+        f"Tu es un nutritionniste expert. "
+        f"Génère un plan de repas sur 7 jours en français, formaté en Markdown. "
+        f"Profil : {user.name}, {user.age} ans{bmi_context}, objectif {goal_fr}. "
+        f"Budget : {payload.budget_euros:.0f}€ pour la semaine. "
+        f"Allergies et intolérances à exclure absolument : {allergies_fr}. "
+        f"Le plan doit inclure : petit-déjeuner, déjeuner, dîner et collation pour chaque jour, "
+        f"les calories estimées par jour, et 2 conseils pratiques pour respecter le budget. "
+        f"Sois concret, varié et adapté à l'objectif."
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1200,
+        )
+        plan_text = response.choices[0].message.content or FALLBACK_MEAL
+        meal_cache.set(cache_key, plan_text)
+    except Exception as exc:
+        logger.error("Erreur OpenAI /meal-plan : %s", exc, exc_info=True)
+        plan_text = FALLBACK_MEAL
+
+    return MealPlanResponse(user_id=user.id, user_name=user.name, plan=plan_text)
 
 
 # =============================================================================
@@ -447,7 +549,7 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=400,
         )
-        analysis_text = response.choices[0].message.content
+        analysis_text = response.choices[0].message.content or FALLBACK_TREND
         trend_cache.set(cache_key, analysis_text)
     except Exception as exc:
         logger.error("Erreur OpenAI /biometric-trend : %s", exc, exc_info=True)

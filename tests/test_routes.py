@@ -274,3 +274,28 @@ def test_coach_biometric_trend_success(client, created_user, created_metric):
     assert response.status_code == 200
     data = response.json()
     assert "analysis" in data
+
+def test_coach_meal_plan_success(client, created_user):
+    mock_resp = _mock_openai_response(
+        "## Plan repas semaine\n**Lundi** : Petit-déj : flocons d'avoine..."
+    )
+    with patch("api.routers.coach.client") as mock_client:
+        mock_client.chat.completions.create.return_value = mock_resp
+        response = client.post("/coach/meal-plan", json={
+            "user_id": created_user["id"],
+            "budget_euros": 50.0,
+            "allergies": ["gluten"],
+        })
+    assert response.status_code == 200
+    data = response.json()
+    assert "plan" in data
+    assert len(data["plan"]) > 0
+
+
+def test_coach_meal_plan_user_not_found(client):
+    response = client.post("/coach/meal-plan", json={
+        "user_id": 99999,
+        "budget_euros": 50.0,
+        "allergies": [],
+    })
+    assert response.status_code == 404
