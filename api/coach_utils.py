@@ -164,3 +164,59 @@ FALLBACK_MEAL = (
     "**Collation** : poignée de fruits secs + fruit frais\n\n"
     "*Adaptez les portions à votre objectif.*"
 )
+
+
+# =============================================================================
+# VALIDATION IMAGE (analyze-photo)
+# =============================================================================
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 Mo — aligné avec le frontend
+
+
+def _detect_image_mime(data: bytes) -> str | None:
+    """Détecte le type réel via les magic bytes, indépendamment du MIME déclaré."""
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "image/gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def validate_image_base64(image_base64: str) -> tuple[bytes, str]:
+    """
+    Décode et valide une image base64.
+    Rejette le texte brut, le base64 invalide ou les formats non supportés.
+    """
+    import base64
+    import binascii
+    import re
+
+    raw = image_base64.strip()
+    if raw.startswith("data:"):
+        if "," not in raw:
+            raise ValueError("Data URL invalide.")
+        raw = raw.split(",", 1)[1]
+
+    if not re.fullmatch(r"[A-Za-z0-9+/=\s]+", raw):
+        raise ValueError("Le contenu doit être une image encodée en base64 valide.")
+
+    try:
+        data = base64.b64decode(raw, validate=True)
+    except binascii.Error as exc:
+        raise ValueError("Encodage base64 invalide.") from exc
+
+    if not data:
+        raise ValueError("Image vide.")
+
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError("Image trop volumineuse (max 10 Mo).")
+
+    mime = _detect_image_mime(data)
+    if not mime:
+        raise ValueError("Le fichier doit être une image JPEG, PNG, WebP ou GIF.")
+
+    return data, mime

@@ -23,7 +23,7 @@
         @drop.prevent="handleDrop"
         @click="fileInput?.click()"
       >
-        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleFileChange" />
+        <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="handleFileChange" />
 
         <div v-if="!previewUrl" class="flex flex-col items-center justify-center py-14 text-center px-6">
           <div class="w-16 h-16 rounded-2xl bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center mb-4">
@@ -36,8 +36,12 @@
           <p class="text-slate-600 text-sm mt-1">JPG, PNG, WebP — max 10 Mo</p>
         </div>
 
-        <div v-else class="relative">
-          <img :src="previewUrl" alt="Aperçu" class="w-full max-h-80 object-cover rounded-xl" />
+        <div v-else class="relative flex items-center justify-center min-h-[280px] max-h-[28rem] p-6 bg-slate-50/80 rounded-xl overflow-hidden">
+          <img
+            :src="previewUrl"
+            alt="Aperçu du repas"
+            class="max-w-full max-h-[24rem] w-auto h-auto object-contain rounded-lg"
+          />
           <div class="absolute inset-0 bg-brand-primary/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-xl">
             <p class="text-sm text-white font-medium bg-brand-primary/70 px-4 py-2 rounded-lg">Cliquer pour changer</p>
           </div>
@@ -110,18 +114,51 @@ const analyzing = ref(false)
 const error = ref('')
 const result = ref(null)
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+function isValidImageSignature(bytes) {
+  if (bytes.length < 12) return false
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return true
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return true
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return true
+  if (
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) return true
+  return false
+}
+
 function handleDrop(e) { dragOver.value = false; const f = e.dataTransfer.files[0]; if (f) loadFile(f) }
 function handleFileChange(e) { const f = e.target.files[0]; if (f) loadFile(f) }
 
 function loadFile(file) {
-  if (!file.type.startsWith('image/')) { error.value = 'Veuillez sélectionner un fichier image valide.'; return }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    error.value = 'Veuillez sélectionner une image JPEG, PNG, WebP ou GIF.'
+    return
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    error.value = 'Fichier trop volumineux (max 10 Mo).'
+    return
+  }
+
   error.value = ''; result.value = ''
   const reader = new FileReader()
   reader.onload = (ev) => {
-    previewUrl.value = ev.target.result
-    imageBase64.value = ev.target.result.split(',')[1]
+    const bytes = new Uint8Array(ev.target.result)
+    if (!isValidImageSignature(bytes)) {
+      error.value = 'Le fichier ne correspond pas à une image valide.'
+      return
+    }
+
+    const dataReader = new FileReader()
+    dataReader.onload = (e) => {
+      previewUrl.value = e.target.result
+      imageBase64.value = e.target.result.split(',')[1]
+    }
+    dataReader.readAsDataURL(file)
   }
-  reader.readAsDataURL(file)
+  reader.readAsArrayBuffer(file)
 }
 
 function clearImage() {

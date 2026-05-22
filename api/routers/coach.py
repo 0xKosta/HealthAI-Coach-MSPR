@@ -3,6 +3,7 @@
 
 import json
 import logging
+import base64
 from datetime import date, timedelta
 from typing import List
 
@@ -15,10 +16,11 @@ from api.database import get_db
 from api.models import User, BiometricMetric, WorkoutSession
 
 from api.coach_utils import (
-    advice_cache, workout_cache, trend_cache,
+    advice_cache, workout_cache, trend_cache, meal_cache,
     coach_limiter,
-    get_fallback_advice, FALLBACK_WORKOUT, FALLBACK_TREND,
-    TTLCache, meal_cache, FALLBACK_MEAL
+    get_fallback_advice, FALLBACK_WORKOUT, FALLBACK_TREND, FALLBACK_MEAL,
+    TTLCache,
+    validate_image_base64,
 )
 
 logger = logging.getLogger(__name__)
@@ -258,6 +260,13 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
 
+    try:
+        image_bytes, mime_type = validate_image_base64(payload.image_base64)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    image_b64 = base64.b64encode(image_bytes).decode("ascii")
+
     # On demande à GPT-4o de répondre exclusivement en JSON structuré.
     # Le "system" message cadre le format de sortie attendu.
     system_prompt = (
@@ -291,7 +300,7 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
                             "type": "image_url",
                             "image_url": {
                                 # L'API OpenAI attend ce format exact pour le base64
-                                "url": f"data:image/jpeg;base64,{payload.image_base64}",
+                                "url": f"data:{mime_type};base64,{image_b64}",
                                 "detail": "low",  # "low" = moins de tokens, assez pour identifier des aliments
                             },
                         },
