@@ -227,3 +227,46 @@ class BiometricMetric(Base):
 
     # Relations
     user: Mapped[User] = relationship(back_populates="biometric_metrics")
+
+# =============================================================================
+# TABLE : user_auth  (authentification réseau social)
+# =============================================================================
+class UserAuth(Base):
+    __tablename__ = "user_auth"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True
+    )
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date()
+    )
+
+    posts: Mapped[list["Post"]] = relationship(
+        back_populates="author", cascade="all, delete-orphan"
+    )
+
+
+# =============================================================================
+# TABLE : posts  (publications du feed social)
+# =============================================================================
+class Post(Base):
+    __tablename__ = "posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_auth_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user_auth.id", ondelete="CASCADE"), nullable=False
+    )
+    caption: Mapped[str | None] = mapped_column(Text)
+    media_url: Mapped[str | None] = mapped_column(Text)
+    media_type: Mapped[str | None] = mapped_column(String(20))
+    created_at: Mapped[date] = mapped_column(
+        Date, nullable=False, server_default=func.current_date()
+    )
+
+    author: Mapped[UserAuth] = relationship(back_populates="posts")
