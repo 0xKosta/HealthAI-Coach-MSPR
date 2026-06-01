@@ -36,22 +36,49 @@ def _copy_from_dataframe(conn, df, target):
     return len(df)
 
 
+def has_user_auth_rows(engine) -> bool:
+    """True si la couche MSPR3 (user_auth) est peuplée — ne pas TRUNCATE users."""
+    with engine.connect() as conn:
+        exists = conn.execute(
+            text(
+                "SELECT EXISTS ("
+                "  SELECT 1 FROM information_schema.tables "
+                "  WHERE table_schema = 'public' AND table_name = 'user_auth'"
+                ")"
+            )
+        ).scalar()
+        if not exists:
+            return False
+        return conn.execute(text("SELECT COUNT(*) FROM user_auth")).scalar_one() > 0
+
+
 def truncate_all(engine):
-    """Vide toutes les tables ETL avant chargement (idempotence par
-    re-création complète). La table exercises est exclue — elle est gérée
-    séparément via upsert pour préserver les traductions FR."""
+    """Vide les tables ETL avant chargement (idempotence par re-création).
+
+    - exercises : jamais tronquée (upsert + traductions FR).
+    - users : jamais tronquée si user_auth contient des lignes (MSPR3 social),
+      sinon TRUNCATE users CASCADE comme avant.
+    """
     tables = [
         "session_exercises",
         "food_logs",
         "biometric_metrics",
         "workout_sessions",
         "foods",
-        "users",
     ]
+    preserve_users = has_user_auth_rows(engine)
+    if not preserve_users:
+        tables.append("users")
+
     with engine.begin() as conn:
         for t in tables:
             conn.execute(text(f"TRUNCATE TABLE {t} RESTART IDENTITY CASCADE;"))
-    logger.info("toutes les tables ETL ont été tronquées (exercises préservée).")
+    if preserve_users:
+        logger.info(
+            "tables ETL tronquées (users et user_auth préservés — comptes sociaux MSPR3)."
+        )
+    else:
+        logger.info("toutes les tables ETL ont été tronquées (exercises préservée).")
 
 
 def insert(engine, df, table):
@@ -64,6 +91,21 @@ def insert(engine, df, table):
         n = _copy_from_dataframe(conn, df, table)
     logger.info(f"[{table}] {n} lignes insérées.")
     return n
+
+
+def insert_users_skip_existing(engine, df, table: str = "users") -> int:
+    """Insère uniquement les users dont le name n'existe pas encore (mode MSPR3)."""
+    if df.empty:
+        return 0
+    existing = fetch_id_map(engine, table, "name")
+    df_new = df[~df["name"].isin(existing.keys())]
+    if df_new.empty:
+        logger.info(f"[{table}] aucun nouvel utilisateur (noms déjà en base).")
+        return 0
+    skipped = len(df) - len(df_new)
+    if skipped:
+        logger.info(f"[{table}] {skipped} utilisateur(s) ignoré(s) (déjà en base).")
+    return insert(engine, df_new, table)
 
 
 def upsert_exercises(engine, df):

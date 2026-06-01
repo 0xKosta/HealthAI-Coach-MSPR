@@ -121,10 +121,15 @@ pip install -r requirements.txt
 python db/seed_auth.py
 ```
 
-| Comptes | `demo001@healthai-coach.demo` … `demo100@…` |
+| Comptes | Email dérivé du profil `users` (ex. `user-000001.42@healthai-coach.demo`) |
+| Affichage | Reprend `users.name` (ex. `User_000042`) — le profil santé reste dans `users` via `user_id` |
 | Mot de passe démo | `1234` |
 
 Vérification Supabase : `SELECT COUNT(*) FROM user_auth;` → 100
+
+Migrations : `002_user_auth_restrict_fk.sql`, `003_drop_user_auth_avatar.sql` (à exécuter sur Supabase si pas déjà fait)
+
+**Important — ETL et `user_auth` :** si `user_auth` contient des lignes, le pipeline ETL **ne tronque plus** `users` (évite la suppression en cascade des comptes sociaux) et crée une **sauvegarde automatique** dans `backups/` avant chaque run. Relancez `python db/seed_auth.py` seulement si vous avez vidé `user_auth` ou changé de base.
 
 ### 7. MSPR 3 — Sauvegarde / restauration de la base
 
@@ -245,7 +250,7 @@ python -m etl.pipeline
 ```
 
 Le pipeline enchaîne : `extract` → `transform` → `load`.  
-Il est **idempotent** : re-exécutable sans créer de doublons (TRUNCATE + reload complet).
+Il est **idempotent** : re-exécutable sans créer de doublons (TRUNCATE + reload). Les comptes **`user_auth`** et la table **`users`** sont **préservés** lorsque `user_auth` n'est pas vide (voir section MSPR 3).
 
 **Prérequis ETL :**
 ```env

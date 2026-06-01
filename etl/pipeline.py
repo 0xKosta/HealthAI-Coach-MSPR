@@ -1,10 +1,14 @@
 import logging
+import subprocess
 import sys
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import text
 
 from etl import config, extract, load, simulate, transform
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def setup_logging():
@@ -37,8 +41,11 @@ def run_users_and_workouts(engine):
         rows_in = len(chunk)
 
         df_users, ru = transform.transform_users(chunk, id_offset=id_offset)
-        load.insert(engine, df_users, config.TBL_USERS)
-        n_users_total += len(df_users)
+        if load.has_user_auth_rows(engine):
+            n_ins = load.insert_users_skip_existing(engine, df_users, config.TBL_USERS)
+        else:
+            n_ins = load.insert(engine, df_users, config.TBL_USERS)
+        n_users_total += n_ins
         rep_users.merge(ru)
 
         df_sess, rs = transform.transform_workout_sessions(chunk, id_offset=id_offset)
@@ -221,7 +228,18 @@ def main():
     try:
         engine = load.get_engine()
 
-        # Idempotence : on repart d'une base vide à chaque run.
+        if load.has_user_auth_rows(engine):
+            log.info(
+                "user_auth détecté — sauvegarde automatique avant ETL "
+                "(users / comptes sociaux non tronqués)."
+            )
+            subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "backup_db.py"), "backup"],
+                cwd=ROOT,
+                check=False,
+            )
+
+        # Idempotence : tables ETL vidées ; users préservés si MSPR3 social actif.
         load.truncate_all(engine)
 
         rep_ex = run_exercises(engine)
