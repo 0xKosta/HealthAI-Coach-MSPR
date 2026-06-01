@@ -24,7 +24,7 @@
         />
         <StatCard
           label="Sommeil moyen"
-          :value="`${avgSleep} h`" sub="Durée quotidienne"
+          :value="`${avgSleep}`" sub="Durée quotidienne"
           icon='<path d="M17 18a5 5 0 0 0-10 0"/><line x1="12" y1="2" x2="12" y2="9"/><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"/><line x1="1" y1="18" x2="3" y2="18"/><line x1="21" y1="18" x2="23" y2="18"/><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"/>'
           iconBg="bg-violet-100" iconColor="text-violet-600"
         />
@@ -136,7 +136,16 @@ const weightDelta = computed(() => {
 })
 const avgSleep = computed(() => {
   const v = userMetrics.value.filter(m => m.sleep_hours)
-  return v.length ? (v.reduce((s, m) => s + m.sleep_hours, 0) / v.length).toFixed(1) : '—'
+
+  if (!v.length) return '—'
+
+  const avg = v.reduce((s, m) => s + m.sleep_hours, 0) / v.length
+  const totalMinutes = Math.round(avg * 60)
+
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  return `${hours}h${minutes.toString().padStart(2, '0')}`
 })
 const avgBpm = computed(() => {
   const v = userMetrics.value.filter(m => m.resting_bpm)
