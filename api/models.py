@@ -250,6 +250,8 @@ class UserAuth(Base):
     posts: Mapped[list["Post"]] = relationship(
         back_populates="author", cascade="all, delete-orphan"
     )
+    
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
 
 
 # =============================================================================

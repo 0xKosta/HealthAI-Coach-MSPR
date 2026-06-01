@@ -175,3 +175,112 @@ def me(current_user: UserAuth = Depends(get_current_user)):
         last_name=current_user.last_name,
         avatar_url=current_user.avatar_url,
     )
+    
+# =============================================================================
+# SCHÉMAS supplémentaires
+# =============================================================================
+
+class UserAuthPublic(BaseModel):
+    id: int
+    email: str
+    first_name: str
+    last_name: str
+    avatar_url: str | None
+    # Données du profil santé lié (peut être null si pas de lien)
+    user_id: int | None
+    user_goal: str | None
+    user_age: int | None
+
+
+class UpdateMeRequest(BaseModel):
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    avatar_url: str | None = None
+
+
+# =============================================================================
+# CRUD user_auth
+# =============================================================================
+
+@router.get(
+    "/users/",
+    response_model=list[UserAuthPublic],
+    summary="Liste tous les comptes (avec profil santé lié)",
+)
+def list_users(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    users = db.query(UserAuth).offset(skip).limit(limit).all()
+    return [
+        UserAuthPublic(
+            id=u.id,
+            email=u.email,
+            first_name=u.first_name,
+            last_name=u.last_name,
+            avatar_url=u.avatar_url,
+            user_id=u.user_id,
+            user_goal=u.user.goal if u.user_id and u.user else None,
+            user_age=u.user.age if u.user_id and u.user else None,
+        )
+        for u in users
+    ]
+
+
+@router.get(
+    "/users/{user_auth_id}",
+    response_model=UserAuthPublic,
+    summary="Récupérer un compte par son ID",
+)
+def get_user(
+    user_auth_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    u = db.query(UserAuth).filter(UserAuth.id == user_auth_id).first()
+    if not u:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compte introuvable.",
+        )
+    return UserAuthPublic(
+        id=u.id,
+        email=u.email,
+        first_name=u.first_name,
+        last_name=u.last_name,
+        avatar_url=u.avatar_url,
+        user_id=u.user_id,
+        user_goal=u.user.goal if u.user_id and u.user else None,
+        user_age=u.user.age if u.user_id and u.user else None,
+    )
+
+
+@router.put(
+    "/me",
+    response_model=MeResponse,
+    summary="Modifier son propre profil",
+)
+def update_me(
+    payload: UpdateMeRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    if payload.first_name is not None:
+        current_user.first_name = payload.first_name
+    if payload.last_name is not None:
+        current_user.last_name = payload.last_name
+    if payload.avatar_url is not None:
+        current_user.avatar_url = payload.avatar_url
+
+    db.commit()
+    db.refresh(current_user)
+
+    return MeResponse(
+        id=current_user.id,
+        email=current_user.email,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        avatar_url=current_user.avatar_url,
+    )
