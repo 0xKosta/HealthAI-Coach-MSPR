@@ -41,6 +41,9 @@ logs/
 *.sqlite
 *.sqlite3
 *.db
+backups/*.dump
+backups/*.sql
+!backups/.gitkeep
 
 # Front-end
 front-end/node_modules/

@@ -108,6 +108,52 @@ psql -h <host> -U <user> -d <dbname> -f db/init.sql
 
 Ou via le **SQL Editor** du dashboard Supabase (copier-coller le contenu de `db/init.sql`).
 
+### 6. MSPR 3 — Réseau social (`user_auth` + `posts`)
+
+> **Ne pas relancer `init.sql`** sur une base déjà peuplée (les `DROP` effacent toutes les données).
+
+1. Migration additive (une fois) : `db/migrations/001_user_auth_posts.sql`
+2. ETL + `db/seed.sql` si ce n’est pas déjà fait
+3. Comptes démo (100) :
+
+```bash
+pip install -r requirements.txt
+python db/seed_auth.py
+```
+
+| Comptes | `demo001@healthai-coach.demo` … `demo100@…` |
+| Mot de passe démo | `1234` |
+
+Vérification Supabase : `SELECT COUNT(*) FROM user_auth;` → 100
+
+### 7. MSPR 3 — Sauvegarde / restauration de la base
+
+**Prérequis :** outils client PostgreSQL (`pg_dump`, `pg_restore`) dans le PATH.  
+Sur Windows : [PostgreSQL](https://www.postgresql.org/download/windows/) ou `winget install PostgreSQL.PostgreSQL`.
+
+Les dumps sont enregistrés dans `backups/` (non versionnés dans Git).
+
+```bash
+# Sauvegarde (fichier backups/healthai_YYYYMMDD_HHMMSS.dump)
+python scripts/backup_db.py backup
+
+# Lister les sauvegardes
+python scripts/backup_db.py list
+
+# Restaurer la dernière sauvegarde (--clean : remplace schéma + données du dump)
+python scripts/backup_db.py restore --latest
+```
+
+**Windows (PowerShell) :**
+
+```powershell
+.\scripts\backup_db.ps1
+.\scripts\restore_db.ps1
+.\scripts\restore_db.ps1 backups\healthai_20260101_120000.dump
+```
+
+> **Supabase :** utilisez l’URI **directe** (port 5432, host `db.<ref>.supabase.co`) dans `.env` si `pg_dump` échoue avec le pooler. Ne commitez jamais `.env`.
+
 ---
 
 ## Installation — Frontend
