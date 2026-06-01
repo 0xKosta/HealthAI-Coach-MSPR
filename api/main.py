@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 
 from api.routers import users, nutrition, exercises, metrics, coach
+from api.routers import users, nutrition, exercises, metrics, coach, auth, posts
 
 load_dotenv()
 
@@ -34,6 +35,14 @@ app.include_router(nutrition.router, prefix="/nutrition", tags=["Nutrition"])
 app.include_router(exercises.router, prefix="/exercises", tags=["Exercices"])
 app.include_router(metrics.router,   prefix="/metrics",   tags=["Métriques"])
 app.include_router(coach.router,     prefix="/coach",     tags=["Coach IA"])
+app.include_router(auth.router,  prefix="/auth",  tags=["Authentification"])
+app.include_router(posts.router, prefix="/posts", tags=["Feed Social"])
+
+#serving des fichiers médias uploadés
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+Path("media").mkdir(exist_ok=True)
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 @app.get("/health", tags=["Santé"], summary="Vérifier l'état de l'API")
 def health_check():

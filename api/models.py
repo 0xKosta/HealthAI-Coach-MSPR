@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import CheckConstraint, Date, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -259,14 +259,13 @@ class Post(Base):
     __tablename__ = "posts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_auth_id: Mapped[int] = mapped_column(
+    author_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user_auth.id", ondelete="CASCADE"), nullable=False
     )
-    caption: Mapped[str | None] = mapped_column(Text)
+    content: Mapped[str | None] = mapped_column(Text)
     media_url: Mapped[str | None] = mapped_column(Text)
     media_type: Mapped[str | None] = mapped_column(String(20))
-    created_at: Mapped[date] = mapped_column(
-        Date, nullable=False, server_default=func.current_date()
-    )
+    created_at: Mapped[datetime | None] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(server_default=func.now())
 
     author: Mapped[UserAuth] = relationship(back_populates="posts")

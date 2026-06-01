@@ -1,13 +1,12 @@
+# api/routers/posts.py
 # Feed social — GET / POST / DELETE
 # Préfixe monté dans main.py : /posts
 
 import logging
-import os
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -18,7 +17,6 @@ from api.routers.auth import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Dossier de stockage des médias — créé automatiquement si absent
 MEDIA_DIR = Path("media/posts")
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -37,14 +35,15 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 Mo
 
 class PostResponse(BaseModel):
     id: int
-    user_auth_id: int
+    author_id: int
     first_name: str
     last_name: str
     avatar_url: str | None
-    caption: str | None
+    content: str | None
     media_url: str | None
     media_type: str | None
     created_at: str
+    updated_at: str | None
 
     class Config:
         from_attributes = True
@@ -67,7 +66,7 @@ def get_feed(
 ):
     posts = (
         db.query(Post)
-        .join(UserAuth, Post.user_auth_id == UserAuth.id)
+        .join(UserAuth, Post.author_id == UserAuth.id)
         .order_by(Post.created_at.desc(), Post.id.desc())
         .offset(skip)
         .limit(limit)
@@ -77,14 +76,15 @@ def get_feed(
     return [
         PostResponse(
             id=p.id,
-            user_auth_id=p.user_auth_id,
+            author_id=p.author_id,
             first_name=p.author.first_name,
             last_name=p.author.last_name,
             avatar_url=p.author.avatar_url,
-            caption=p.caption,
+            content=p.content,
             media_url=p.media_url,
             media_type=p.media_type,
             created_at=str(p.created_at),
+            updated_at=str(p.updated_at) if p.updated_at else None,
         )
         for p in posts
     ]
@@ -97,12 +97,12 @@ def get_feed(
     summary="Créer une publication (texte + média optionnel)",
 )
 async def create_post(
-    caption: str | None = Form(None),
+    content: str | None = Form(None),
     media: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: UserAuth = Depends(get_current_user),
 ):
-    if not caption and not media:
+    if not content and not media:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Un post doit contenir au moins un texte ou un média.",
@@ -112,34 +112,31 @@ async def create_post(
     media_type_str = None
 
     if media and media.filename:
-        # Validation du type MIME
         if media.content_type not in ALLOWED_TYPES:
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                detail=f"Type de fichier non supporté : {media.content_type}. "
-                       f"Formats acceptés : JPEG, PNG, WebP, MP4.",
+                detail=f"Type non supporté : {media.content_type}. Acceptés : JPEG, PNG, WebP, MP4.",
             )
 
-        # Lecture et validation de la taille
-        content = await media.read()
-        if len(content) > MAX_FILE_SIZE:
+        # ⚠️ Variable renommée 'raw_bytes' pour ne pas écraser le paramètre 'content'
+        raw_bytes = await media.read()
+        if len(raw_bytes) > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Fichier trop volumineux (max 50 Mo).",
+                detail="Fichier trop volumineux (max 50 Mo).",
             )
 
-        # Sauvegarde avec nom UUID pour éviter les collisions
         ext = ALLOWED_TYPES[media.content_type]
         filename = f"{uuid.uuid4().hex}{ext}"
         filepath = MEDIA_DIR / filename
-        filepath.write_bytes(content)
+        filepath.write_bytes(raw_bytes)
 
         media_url = f"/media/posts/{filename}"
         media_type_str = "image" if media.content_type.startswith("image/") else "video"
 
     post = Post(
-        user_auth_id=current_user.id,
-        caption=caption,
+        author_id=current_user.id,
+        content=content,
         media_url=media_url,
         media_type=media_type_str,
     )
@@ -149,14 +146,15 @@ async def create_post(
 
     return PostResponse(
         id=post.id,
-        user_auth_id=post.user_auth_id,
+        author_id=post.author_id,
         first_name=current_user.first_name,
         last_name=current_user.last_name,
         avatar_url=current_user.avatar_url,
-        caption=post.caption,
+        content=post.content,
         media_url=post.media_url,
         media_type=post.media_type,
         created_at=str(post.created_at),
+        updated_at=str(post.updated_at) if post.updated_at else None,
     )
 
 
@@ -174,14 +172,12 @@ def delete_post(
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post introuvable.")
 
-    # Seul l'auteur peut supprimer son post
-    if post.user_auth_id != current_user.id:
+    if post.author_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Vous ne pouvez supprimer que vos propres publications.",
         )
 
-    # Supprimer le fichier média si présent
     if post.media_url:
         filepath = Path(post.media_url.lstrip("/"))
         if filepath.exists():
