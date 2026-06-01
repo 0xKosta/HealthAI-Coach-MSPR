@@ -2,16 +2,20 @@
   <div class="space-y-8 animate-fade-in">
 
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Dashboard</h1>
-        <p class="text-slate-600 mt-1">Vue d'ensemble de votre santé personnalisée</p>
+        <p class="text-slate-600 mt-1">Vue d'ensemble santé de l'utilisateur sélectionné</p>
       </div>
-      <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
+      <div class="flex flex-wrap items-center gap-3">
+        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+      </div>
     </div>
 
-    <LoadingSpinner v-if="userStore.loading" message="Chargement des utilisateurs..." />
-    <ErrorAlert v-else-if="userStore.error" :message="userStore.error" />
+    <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
+
+    <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
+    <ErrorAlert v-else-if="userError" :message="userError" />
 
     <template v-else-if="user">
 
@@ -135,22 +139,63 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import { coachAPI } from '@/services/api'
-import UserSelector from '@/components/ui/UserSelector.vue'
+import { coachAPI, usersAPI } from '@/services/api'
+import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
-const user = computed(() => userStore.selectedUser)
+const route = useRoute()
+const router = useRouter()
+const activeUserId = ref(null)
+const activeUser = ref(null)
+const userLoading = ref(false)
+const userError = ref('')
+const user = computed(() => activeUser.value)
 
 const advice = ref('')
 const adviceLoading = ref(false)
 const adviceError = ref('')
 
-watch(() => userStore.selectedUserId, () => { advice.value = ''; adviceError.value = '' })
+function parseUserIdFromRoute() {
+  const parsed = Number(route.params.userId)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+async function loadUserProfile() {
+  if (!activeUserId.value) return
+  userLoading.value = true
+  userError.value = ''
+  try {
+    const res = await usersAPI.getById(activeUserId.value)
+    activeUser.value = res.data
+    userStore.selectUser(activeUserId.value)
+  } catch {
+    userError.value = "Impossible de charger ce profil utilisateur."
+    activeUser.value = null
+  } finally {
+    userLoading.value = false
+  }
+}
+
+function goToUsersList() {
+  router.push('/admin')
+}
+
+watch(() => route.params.userId, async () => {
+  advice.value = ''
+  adviceError.value = ''
+  activeUserId.value = parseUserIdFromRoute()
+  if (!activeUserId.value) {
+    goToUsersList()
+    return
+  }
+  await loadUserProfile()
+}, { immediate: true })
 
 const goalLabels = {
   weight_loss: 'Perte de poids', muscle_gain: 'Prise de muscle',

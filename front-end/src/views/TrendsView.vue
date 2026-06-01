@@ -1,13 +1,30 @@
 <template>
   <div class="space-y-8 animate-fade-in">
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Tendances Biométriques</h1>
         <p class="text-slate-600 mt-1">Évolution de vos données de santé sur 30 jours</p>
       </div>
-      <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
+      <div class="flex items-center gap-3">
+        <div v-if="currentUser" class="hidden sm:flex items-center gap-2 text-sm text-slate-600">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white">
+            <svg v-if="currentUser.gender === 'female'" class="w-4 h-4 text-pink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M12 12v9M9 18h6" />
+            </svg>
+            <svg v-else class="w-4 h-4 text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="10" cy="14" r="5" />
+              <path d="M14 10l6-6M16 4h4v4" />
+            </svg>
+          </span>
+          <span class="font-medium text-brand-primary">{{ currentUser.name }}</span>
+        </div>
+        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+      </div>
     </div>
+
+    <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
 
     <LoadingSpinner v-if="metricsLoading" message="Chargement des métriques..." />
     <ErrorAlert v-if="metricsError" :message="metricsError" />
@@ -104,21 +121,28 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import { metricsAPI, coachAPI } from '@/services/api'
-import UserSelector from '@/components/ui/UserSelector.vue'
+import { metricsAPI, coachAPI, usersAPI } from '@/services/api'
+import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
 const allMetrics = ref([])
 const metricsLoading = ref(false)
 const metricsError = ref('')
 const trendAnalysis = ref('')
 const trendLoading = ref(false)
 const trendError = ref('')
+const activeUserId = ref(null)
+const activeUser = ref(null)
+
+const currentUser = computed(() => activeUser.value)
 
 const userMetrics = computed(() =>
   allMetrics.value
@@ -194,18 +218,18 @@ const sleepBpmSeries = computed(() => [
 ])
 
 async function loadMetrics() {
-  if (!userStore.selectedUserId) return
+  if (!activeUserId.value) return
   metricsLoading.value = true; metricsError.value = ''
-  try { const res = await metricsAPI.getByUser(userStore.selectedUserId); allMetrics.value = res.data }
+  try { const res = await metricsAPI.getByUser(activeUserId.value); allMetrics.value = res.data }
   catch { metricsError.value = 'Impossible de charger les métriques biométriques.' }
   finally { metricsLoading.value = false }
 }
 
 async function fetchTrendAnalysis() {
-  if (!userStore.selectedUserId) return
+  if (!activeUserId.value) return
   trendLoading.value = true; trendError.value = ''; trendAnalysis.value = ''
   try {
-    const res = await coachAPI.getBiometricTrend(userStore.selectedUserId)
+    const res = await coachAPI.getBiometricTrend(activeUserId.value)
     trendAnalysis.value = res.data.analysis
   } catch {
     trendError.value = "Erreur lors de l'analyse. Vérifiez la connexion à l'API."
@@ -214,6 +238,48 @@ async function fetchTrendAnalysis() {
   }
 }
 
-watch(() => userStore.selectedUserId, () => { trendAnalysis.value = ''; trendError.value = ''; loadMetrics() })
-onMounted(() => loadMetrics())
+function resetTrendState() {
+  trendAnalysis.value = ''
+  trendError.value = ''
+}
+
+function parseUserIdFromRoute() {
+  const parsed = Number(route.params.userId)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function goToUsersList() {
+  router.push('/admin')
+}
+
+async function loadUserProfile() {
+  if (!activeUserId.value) return
+  try {
+    const res = await usersAPI.getById(activeUserId.value)
+    activeUser.value = res.data
+  } catch {
+    activeUser.value = null
+  }
+}
+
+watch(
+  () => route.params.userId,
+  () => {
+    activeUserId.value = parseUserIdFromRoute()
+    if (!activeUserId.value) {
+      goToUsersList()
+      return
+    }
+    userStore.selectUser(activeUserId.value)
+    loadUserProfile()
+    resetTrendState()
+    loadMetrics()
+  },
+  { immediate: true }
+)
+
+onMounted(async () => {
+  if (!activeUserId.value) return
+  await loadUserProfile()
+})
 </script>

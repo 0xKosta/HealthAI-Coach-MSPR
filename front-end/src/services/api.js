@@ -7,7 +7,7 @@ const api = axios.create({
 })
 
 export const usersAPI = {
-  getAll: () => api.get('/users/'),
+  getAll: (params) => api.get('/users/', { params }),
   getById: (id) => api.get(`/users/${id}`)
 }
 

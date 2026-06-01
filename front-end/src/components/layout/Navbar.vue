@@ -6,7 +6,7 @@
 
         <!-- Logo — centré mobile, à gauche desktop -->
         <RouterLink
-          to="/"
+          to="/admin"
           class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:static sm:translate-x-0 sm:translate-y-0 flex items-center"
         >
           <img
@@ -23,7 +23,7 @@
             :key="link.to"
             :to="link.to"
             class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-            :class="isActive(link.to)
+            :class="isActive(link)
               ? 'bg-brand-accent text-white'
               : 'text-slate-300 hover:text-white hover:bg-white/10'"
           >
@@ -51,7 +51,7 @@
         :key="link.to"
         :to="link.to"
         class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-        :class="isActive(link.to) ? 'text-brand-accent' : 'text-slate-400'"
+        :class="isActive(link) ? 'text-brand-accent' : 'text-slate-400'"
       >
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -63,34 +63,26 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-const navLinks = [
+const navLinks = computed(() => [
   {
-    to: '/', label: 'Dashboard', shortLabel: 'Home',
+    to: '/admin', label: 'Utilisateurs', shortLabel: 'Users',
     icon: '<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
-  },
-  {
-    to: '/nutrition', label: 'Nutrition', shortLabel: 'Nutrition',
-    icon: '<path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'
-  },
-  {
-    to: '/workout', label: 'Entraînement', shortLabel: 'Workout',
-    icon: '<path d="M6 4v16M18 4v16M10 8H6M10 16H6M18 8h-4M18 16h-4"/>'
   },
   {
     to: '/exercises', label: 'Exercices', shortLabel: 'Exercices',
     icon: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>'
   },
-  {
-    to: '/trends', label: 'Tendances', shortLabel: 'Trends',
-    icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'
-  },
-]
+])
 
-function isActive(to) {
-  return to === '/' ? route.path === '/' : route.path.startsWith(to)
+function isActive(link) {
+  if (link.to === '/admin') {
+    return route.path === '/admin' || route.path.startsWith('/admin/dashboard/')
+  }
+  return route.path.startsWith(link.to)
 }
 </script>

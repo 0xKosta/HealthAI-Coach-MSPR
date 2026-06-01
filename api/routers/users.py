@@ -2,7 +2,7 @@
 # CRUD complet pour la ressource User
 # Préfixe monté dans main.py : /users
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from api.database import get_db
@@ -21,9 +21,20 @@ router = APIRouter()
 def list_users(
     skip: int = Query(0, ge=0, description="Nombre d'entrées à ignorer"),
     limit: int = Query(100, ge=1, le=1000, description="Nombre maximum d'entrées à retourner"),
+    q: str | None = Query(None, description="Filtre de recherche sur le nom/prénom"),
+    response: Response = None,
     db: Session = Depends(get_db),
 ):
-    return db.query(User).offset(skip).limit(limit).all()
+    query = db.query(User)
+    if q:
+        search = q.strip()
+        if search:
+            like = f"%{search}%"
+            query = query.filter(User.name.ilike(like))
+    total_count = query.count()
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total_count)
+    return query.order_by(User.id).offset(skip).limit(limit).all()
 
 
 @router.get(

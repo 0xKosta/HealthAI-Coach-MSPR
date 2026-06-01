@@ -2,16 +2,23 @@
   <div class="space-y-8 animate-fade-in">
 
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Programme d'Entraînement</h1>
         <p class="text-slate-600 mt-1">Générez un plan IA personnalisé selon votre profil et vos objectifs</p>
       </div>
-      <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
+      <div class="flex flex-wrap items-center gap-3">
+        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+      </div>
     </div>
 
+    <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
+
+    <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
+    <ErrorAlert v-else-if="userError" :message="userError" />
+
     <!-- Formulaire de configuration -->
-    <div class="card">
+    <div v-if="currentUser" class="card">
       <h2 class="text-xl font-bold text-brand-primary mb-6">Paramètres du programme</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>
@@ -47,8 +54,8 @@
       </div>
       <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-4">
         <p class="text-sm text-slate-600">
-          <span class="font-medium text-brand-primary">{{ userStore.selectedUser?.name }}</span>
-          · {{ goalLabels[userStore.selectedUser?.goal] }} · {{ form.daysPerWeek }}j/semaine
+          <span class="font-medium text-brand-primary">{{ currentUser?.name }}</span>
+          · {{ goalLabels[currentUser?.goal] }} · {{ form.daysPerWeek }}j/semaine
         </p>
         <button @click="generatePlan" :disabled="generating" class="btn-primary">
           <div v-if="generating" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
@@ -84,14 +91,22 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import { coachAPI } from '@/services/api'
-import UserSelector from '@/components/ui/UserSelector.vue'
+import { coachAPI, usersAPI } from '@/services/api'
+import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
+import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
+const activeUserId = ref(null)
+const currentUser = ref(null)
+const userLoading = ref(false)
+const userError = ref('')
 
 const form = ref({ equipment: 'dumbbell', daysPerWeek: 3 })
 const generating = ref(false)
@@ -121,10 +136,10 @@ const daysLabel = computed(() => {
 })
 
 async function generatePlan() {
-  if (!userStore.selectedUserId) return
+  if (!activeUserId.value) return
   generating.value = true; planError.value = ''; plan.value = null
   try {
-    const res = await coachAPI.getWorkoutPlan(userStore.selectedUserId, form.value.equipment, form.value.daysPerWeek)
+    const res = await coachAPI.getWorkoutPlan(activeUserId.value, form.value.equipment, form.value.daysPerWeek)
     plan.value = res.data
   } catch {
     planError.value = "Erreur lors de la génération du programme. Vérifiez la connexion à l'API."
@@ -132,4 +147,38 @@ async function generatePlan() {
     generating.value = false
   }
 }
+
+function parseUserIdFromRoute() {
+  const parsed = Number(route.params.userId)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+async function loadUserProfile() {
+  if (!activeUserId.value) return
+  userLoading.value = true
+  userError.value = ''
+  try {
+    const res = await usersAPI.getById(activeUserId.value)
+    currentUser.value = res.data
+    userStore.selectUser(activeUserId.value)
+  } catch {
+    userError.value = "Impossible de charger ce profil utilisateur."
+    currentUser.value = null
+  } finally {
+    userLoading.value = false
+  }
+}
+
+function goToUsersList() {
+  router.push('/admin')
+}
+
+watch(() => route.params.userId, async () => {
+  activeUserId.value = parseUserIdFromRoute()
+  if (!activeUserId.value) {
+    goToUsersList()
+    return
+  }
+  await loadUserProfile()
+}, { immediate: true })
 </script>

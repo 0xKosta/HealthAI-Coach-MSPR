@@ -1,16 +1,23 @@
 <template>
   <div class="space-y-8 animate-fade-in">
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Analyse Nutritionnelle</h1>
         <p class="text-slate-600 mt-1">Analysez un repas par photo grâce à l'IA vision</p>
       </div>
-      <UserSelector v-if="userStore.users.length" v-model="userStore.selectedUserId" :users="userStore.users" />
+      <div class="flex flex-wrap items-center gap-3">
+        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+      </div>
     </div>
 
+    <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
+
+    <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
+    <ErrorAlert v-else-if="userError" :message="userError" />
+
     <!-- Zone upload -->
-    <div class="card">
+    <div v-if="currentUser" class="card">
       <h2 class="text-xl font-bold text-brand-primary mb-5">Photo du repas</h2>
 
       <div
@@ -49,7 +56,7 @@
       </div>
 
       <div class="flex flex-col sm:flex-row gap-3 mt-4">
-        <button @click="analyzePhoto" :disabled="!previewUrl || analyzing || !userStore.selectedUserId" class="btn-primary flex-1">
+        <button @click="analyzePhoto" :disabled="!previewUrl || analyzing || !activeUserId" class="btn-primary flex-1">
           <div v-if="analyzing" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
           <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -98,14 +105,22 @@
 </template>
 
 <script setup>
-import { ref, defineComponent, h } from 'vue'
+import { ref, defineComponent, h, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import { coachAPI } from '@/services/api'
-import UserSelector from '@/components/ui/UserSelector.vue'
+import { coachAPI, usersAPI } from '@/services/api'
+import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
+import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
+const activeUserId = ref(null)
+const currentUser = ref(null)
+const userLoading = ref(false)
+const userError = ref('')
 const fileInput = ref(null)
 const previewUrl = ref('')
 const imageBase64 = ref('')
@@ -166,11 +181,36 @@ function clearImage() {
   if (fileInput.value) fileInput.value.value = ''
 }
 
+function parseUserIdFromRoute() {
+  const parsed = Number(route.params.userId)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+async function loadUserProfile() {
+  if (!activeUserId.value) return
+  userLoading.value = true
+  userError.value = ''
+  try {
+    const res = await usersAPI.getById(activeUserId.value)
+    currentUser.value = res.data
+    userStore.selectUser(activeUserId.value)
+  } catch {
+    userError.value = "Impossible de charger ce profil utilisateur."
+    currentUser.value = null
+  } finally {
+    userLoading.value = false
+  }
+}
+
+function goToUsersList() {
+  router.push('/admin')
+}
+
 async function analyzePhoto() {
-  if (!imageBase64.value || !userStore.selectedUserId) return
+  if (!imageBase64.value || !activeUserId.value) return
   analyzing.value = true; error.value = ''; result.value = null
   try {
-    const res = await coachAPI.analyzePhoto(userStore.selectedUserId, imageBase64.value)
+    const res = await coachAPI.analyzePhoto(activeUserId.value, imageBase64.value)
     result.value = res.data
   } catch {
     error.value = "Erreur lors de l'analyse. Vérifiez la connexion à l'API."
@@ -188,4 +228,13 @@ const MacroCard = defineComponent({
     ])
   },
 })
+
+watch(() => route.params.userId, async () => {
+  activeUserId.value = parseUserIdFromRoute()
+  if (!activeUserId.value) {
+    goToUsersList()
+    return
+  }
+  await loadUserProfile()
+}, { immediate: true })
 </script>

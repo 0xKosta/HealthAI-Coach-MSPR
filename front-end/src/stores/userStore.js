@@ -17,7 +17,7 @@ export const useUserStore = defineStore('user', () => {
     error.value = null
     try {
       const res = await usersAPI.getAll()
-      users.value = res.data
+      users.value = [...res.data].sort((a, b) => a.id - b.id)
       if (users.value.length && !selectedUserId.value) {
         selectedUserId.value = users.value[0].id
       }
