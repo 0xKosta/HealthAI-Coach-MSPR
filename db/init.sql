@@ -77,7 +77,7 @@ COMMENT ON COLUMN foods.calories_per_100g IS 'Valeur calorique pour 100g de prod
 -- Source : ExerciseDB (GitHub, JSON)
 --
 -- v1.1 : ajout gif_url, video_url, image_url
--- v1.2 : instructions renommée instructions_en + ajout instructions_fr (traduction FR)
+-- v1.2 : ajout instructions_fr (traduction FR de la colonne instructions)
 -- v1.3 : ajout name_fr, type_fr, muscle_group_fr, equipment_fr, level_fr (internationalisation EN/FR)
 -- =============================================================================
 CREATE TABLE exercises (
@@ -92,7 +92,7 @@ CREATE TABLE exercises (
     equipment_fr      VARCHAR(100),
     level             VARCHAR(50)     CHECK (level IN ('beginner', 'intermediate', 'expert')),
     level_fr          VARCHAR(50),
-    instructions_en   TEXT,
+    instructions      TEXT,
     instructions_fr   TEXT,
     gif_url           TEXT,
     video_url         TEXT,
@@ -109,7 +109,7 @@ COMMENT ON COLUMN exercises.muscle_group_fr  IS 'Groupe musculaire principal cib
 COMMENT ON COLUMN exercises.equipment_fr     IS 'Équipement requis traduit en français';
 COMMENT ON COLUMN exercises.level            IS 'Niveau de difficulté : beginner, intermediate, expert';
 COMMENT ON COLUMN exercises.level_fr         IS 'Niveau de difficulté en français : débutant, intermédiaire, expert';
-COMMENT ON COLUMN exercises.instructions_en  IS 'Instructions originales en anglais issues d''ExerciseDB';
+COMMENT ON COLUMN exercises.instructions     IS 'Instructions originales en anglais issues d''ExerciseDB';
 COMMENT ON COLUMN exercises.instructions_fr  IS 'Traduction française générée via deep-translator (GoogleTranslator)';
 COMMENT ON COLUMN exercises.gif_url          IS 'URL du GIF animé illustrant le mouvement';
 COMMENT ON COLUMN exercises.video_url        IS 'URL vidéo YouTube de démonstration — player front Bloc 2';
