@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-8 animate-fade-in">
+  <div class="space-y-8 animate-fade-in" @touchstart.passive="onTouchStart" @touchmove="onTouchMove" @touchend.passive="onTouchEnd">
 
     <!-- Header -->
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -7,8 +7,8 @@
         <h1 class="text-3xl font-bold text-brand-primary">Dashboard</h1>
         <p class="text-slate-600 mt-1">Vue d'ensemble santé de l'utilisateur sélectionné</p>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+      <div v-if="isAdminScope" class="flex flex-wrap items-center gap-3">
+        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
     </div>
 
@@ -19,17 +19,36 @@
 
     <template v-else-if="user">
 
+      <!-- Invitation à compléter le profil (utilisateur uniquement) -->
+      <RouterLink
+        v-if="!isAdminScope && isProfileIncomplete && activeUserId"
+        :to="`/dashboard/${activeUserId}/profile`"
+        class="flex items-center gap-3 p-4 rounded-xl bg-brand-warning/10 border border-brand-warning/30 text-amber-800 hover:bg-brand-warning/15 transition-colors"
+      >
+        <span class="material-symbols-outlined text-[22px] leading-none text-brand-warning">info</span>
+        <span class="text-sm font-medium">Complétez votre profil pour des conseils personnalisés.</span>
+        <span class="material-symbols-outlined text-[18px] leading-none ml-auto">chevron_right</span>
+      </RouterLink>
+
       <!-- Profil + Stats -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         <!-- Carte profil — fond #F4F7FB -->
         <div class="card lg:col-span-1">
           <div class="flex items-center gap-4 mb-5">
-            <div class="w-14 h-14 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-2xl font-bold text-brand-primary">
-              {{ user.name.charAt(0).toUpperCase() }}
+            <div class="w-14 h-14 rounded-2xl border flex items-center justify-center" :class="avatarBgClass">
+              <svg v-if="user.gender === 'female'" class="w-7 h-7 text-pink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <circle cx="12" cy="8" r="4" /><path d="M12 12v9M9 18h6" />
+              </svg>
+              <svg v-else-if="user.gender === 'male'" class="w-7 h-7 text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <circle cx="10" cy="14" r="5" /><path d="M14 10l6-6M16 4h4v4" />
+              </svg>
+              <svg v-else class="w-7 h-7 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" />
+              </svg>
             </div>
             <div>
-              <h2 class="text-xl font-bold text-brand-primary">{{ user.name }}</h2>
+              <h2 class="text-xl font-bold text-brand-primary">{{ displayName }}</h2>
               <span :class="goalBadgeClass">{{ goalLabel }}</span>
             </div>
           </div>
@@ -131,7 +150,7 @@
         </div>
 
         <!-- Carte IA — fond bleu nuit #08104D (zone structurante) -->
-        <AIAdviceCard v-if="advice" :title="`Conseil pour ${user.name}`" :content="advice" />
+        <AIAdviceCard v-if="advice" :title="`Conseil pour ${displayName}`" :content="advice" />
       </div>
     </template>
   </div>
@@ -141,7 +160,9 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
+import { useViewNav } from '@/composables/useViewNav'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -150,14 +171,39 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
+const auth = useAuthStore()
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
 const activeUserId = ref(null)
+const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
 const activeUser = ref(null)
 const userLoading = ref(false)
 const userError = ref('')
 const user = computed(() => activeUser.value)
+
+// Côté utilisateur : prénom du compte connecté (user_auth).
+// Côté admin : nom du profil consulté (users.name).
+const displayName = computed(() => {
+  if (!isAdminScope.value && auth.currentUser?.first_name) {
+    return auth.currentUser.first_name
+  }
+  return activeUser.value?.name
+})
+
+const avatarBgClass = computed(() => {
+  const g = activeUser.value?.gender
+  if (g === 'female') return 'bg-pink-100 border-pink-200'
+  if (g === 'male') return 'bg-sky-100 border-sky-200'
+  return 'bg-slate-100 border-slate-200'
+})
+
+// Profil considéré incomplet tant que les mesures clés ne sont pas renseignées
+const isProfileIncomplete = computed(() => {
+  const u = activeUser.value
+  if (!u) return false
+  return u.age == null || u.weight_kg == null || u.height_cm == null || !u.goal
+})
 
 const advice = ref('')
 const adviceLoading = ref(false)

@@ -1,0 +1,211 @@
+<template>
+  <div class="max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl font-bold text-brand-primary">Mon profil santé</h1>
+        <p class="text-slate-600 mt-1">Complétez vos informations - l'IMC est calculé automatiquement</p>
+      </div>
+      <RouterLink :to="dashboardLink" class="btn-secondary">Retour</RouterLink>
+    </div>
+
+    <LoadingSpinner v-if="loading" message="Chargement du profil..." />
+    <ErrorAlert v-else-if="loadError" :message="loadError" />
+
+    <form v-else class="card space-y-6" @submit.prevent="onSubmit">
+      <ErrorAlert v-if="formError" :message="formError" />
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <!-- Âge -->
+        <div>
+          <label class="label" for="age">Âge</label>
+          <input id="age" v-model.number="form.age" type="number" min="0" max="120" class="input" placeholder="ex. 30" />
+        </div>
+
+        <!-- Genre -->
+        <div>
+          <label class="label" for="gender">Genre</label>
+          <select id="gender" v-model="form.gender" class="select">
+            <option :value="null">Non précisé</option>
+            <option value="male">Homme</option>
+            <option value="female">Femme</option>
+            <option value="other">Autre</option>
+          </select>
+        </div>
+
+        <!-- Poids -->
+        <div>
+          <label class="label" for="weight">Poids (kg)</label>
+          <input id="weight" v-model.number="form.weight_kg" type="number" min="1" step="0.1" class="input" placeholder="ex. 68.5" />
+        </div>
+
+        <!-- Taille -->
+        <div>
+          <label class="label" for="height">Taille (cm)</label>
+          <input id="height" v-model.number="form.height_cm" type="number" min="1" step="0.1" class="input" placeholder="ex. 172" />
+        </div>
+
+        <!-- Masse grasse -->
+        <div>
+          <label class="label" for="bodyfat">Masse grasse (%)<span class="text-slate-400 font-normal"> — optionnel</span></label>
+          <input id="bodyfat" v-model.number="form.body_fat_pct" type="number" min="0" max="100" step="0.1" class="input" placeholder="ex. 22" />
+        </div>
+
+        <!-- Objectif -->
+        <div>
+          <label class="label" for="goal">Objectif</label>
+          <select id="goal" v-model="form.goal" class="select">
+            <option :value="null">Non défini</option>
+            <option value="weight_loss">Perte de poids</option>
+            <option value="muscle_gain">Prise de muscle</option>
+            <option value="sleep_improvement">Améliorer le sommeil</option>
+            <option value="maintenance">Maintien</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- IMC calculé -->
+      <div class="flex items-center justify-between rounded-xl bg-brand-light border border-slate-200 px-4 py-3">
+        <div>
+          <p class="text-sm font-medium text-brand-primary">IMC (calculé automatiquement)</p>
+          <p class="text-xs text-slate-500">Basé sur le poids et la taille</p>
+        </div>
+        <div class="text-right">
+          <p class="text-2xl font-bold" :class="bmiColor">{{ bmi ?? '—' }}</p>
+          <p v-if="bmiCategory" class="text-xs text-slate-600">{{ bmiCategory }}</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <RouterLink :to="dashboardLink" class="btn-secondary">Annuler</RouterLink>
+        <button type="submit" :disabled="saving" class="btn-primary">
+          <div v-if="saving" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
+          {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { authAPI } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
+import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
+import ErrorAlert from '@/components/ui/ErrorAlert.vue'
+
+const router = useRouter()
+const auth = useAuthStore()
+
+const loading = ref(true)
+const loadError = ref('')
+const saving = ref(false)
+const formError = ref('')
+
+const form = reactive({
+  age: null,
+  gender: null,
+  weight_kg: null,
+  height_cm: null,
+  body_fat_pct: null,
+  goal: null,
+})
+
+const dashboardLink = computed(() =>
+  auth.profileId ? `/dashboard/${auth.profileId}` : '/'
+)
+
+// IMC live = poids / (taille_m)²
+const bmi = computed(() => {
+  if (!form.weight_kg || !form.height_cm) return null
+  const h = form.height_cm / 100
+  const value = form.weight_kg / (h * h)
+  return Number.isFinite(value) ? value.toFixed(1) : null
+})
+
+const bmiCategory = computed(() => {
+  if (bmi.value == null) return ''
+  const b = Number(bmi.value)
+  if (b < 18.5) return 'Insuffisant'
+  if (b < 25) return 'Normal'
+  if (b < 30) return 'Surpoids'
+  return 'Obésité'
+})
+
+const bmiColor = computed(() => {
+  if (bmi.value == null) return 'text-slate-400'
+  const b = Number(bmi.value)
+  if (b < 18.5) return 'text-brand-warning'
+  if (b < 25) return 'text-teal-600'
+  if (b < 30) return 'text-amber-600'
+  return 'text-brand-error'
+})
+
+function validate() {
+  if (form.age != null && (form.age < 0 || form.age > 120)) {
+    return "L'âge doit être compris entre 0 et 120."
+  }
+  if (form.weight_kg != null && form.weight_kg <= 0) {
+    return 'Le poids doit être supérieur à 0.'
+  }
+  if (form.height_cm != null && form.height_cm <= 0) {
+    return 'La taille doit être supérieure à 0.'
+  }
+  if (form.body_fat_pct != null && (form.body_fat_pct < 0 || form.body_fat_pct > 100)) {
+    return 'La masse grasse doit être comprise entre 0 et 100.'
+  }
+  return ''
+}
+
+// Convertit les chaînes vides / NaN en null (cohérence avec la base)
+function clean(value) {
+  return value === '' || value === undefined || Number.isNaN(value) ? null : value
+}
+
+async function loadProfile() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const res = await authAPI.getProfile()
+    const p = res.data
+    form.age = p.age ?? null
+    form.gender = p.gender ?? null
+    form.weight_kg = p.weight_kg ?? null
+    form.height_cm = p.height_cm ?? null
+    form.body_fat_pct = p.body_fat_pct ?? null
+    form.goal = p.goal ?? null
+  } catch (e) {
+    loadError.value =
+      e.response?.status === 404
+        ? "Aucun profil santé lié à ce compte."
+        : 'Impossible de charger le profil.'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onSubmit() {
+  formError.value = validate()
+  if (formError.value) return
+
+  saving.value = true
+  try {
+    await authAPI.updateProfile({
+      age: clean(form.age),
+      gender: clean(form.gender),
+      weight_kg: clean(form.weight_kg),
+      height_cm: clean(form.height_cm),
+      body_fat_pct: clean(form.body_fat_pct),
+      goal: clean(form.goal),
+    })
+    router.push(dashboardLink.value)
+  } catch (e) {
+    formError.value =
+      e.response?.data?.detail || "Erreur lors de l'enregistrement du profil."
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(loadProfile)
+</script>

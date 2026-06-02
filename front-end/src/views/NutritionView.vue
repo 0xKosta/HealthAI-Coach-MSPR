@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-8 animate-fade-in">
+  <div class="space-y-8 animate-fade-in" @touchstart.passive="onTouchStart" @touchmove="onTouchMove" @touchend.passive="onTouchEnd">
 
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
@@ -109,6 +109,7 @@ import { ref, defineComponent, h, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
+import { useViewNav } from '@/composables/useViewNav'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -120,6 +121,7 @@ const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
 const activeUserId = ref(null)
+const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
 const currentUser = ref(null)
 const userLoading = ref(false)
 const userError = ref('')

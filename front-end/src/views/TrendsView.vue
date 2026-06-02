@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-8 animate-fade-in">
+  <div class="space-y-8 animate-fade-in" @touchstart.passive="onTouchStart" @touchmove="onTouchMove" @touchend.passive="onTouchEnd">
 
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
@@ -18,7 +18,7 @@
               <path d="M14 10l6-6M16 4h4v4" />
             </svg>
           </span>
-          <span class="font-medium text-brand-primary">{{ currentUser.name }}</span>
+          <span class="font-medium text-brand-primary">{{ displayName }}</span>
         </div>
         <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
@@ -123,7 +123,9 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
+import { useViewNav } from '@/composables/useViewNav'
 import { metricsAPI, coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -132,6 +134,7 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
+const auth = useAuthStore()
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -142,9 +145,18 @@ const trendAnalysis = ref('')
 const trendLoading = ref(false)
 const trendError = ref('')
 const activeUserId = ref(null)
+const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
 const activeUser = ref(null)
 
 const currentUser = computed(() => activeUser.value)
+
+// Prénom du compte connecté côté utilisateur, nom du profil côté admin
+const displayName = computed(() => {
+  if (!isAdminScope.value && auth.currentUser?.first_name) {
+    return auth.currentUser.first_name
+  }
+  return activeUser.value?.name
+})
 
 const userMetrics = computed(() =>
   allMetrics.value

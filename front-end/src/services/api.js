@@ -42,7 +42,10 @@ export const authAPI = {
     })
   },
   me: () => api.get('/auth/me'),
-  updateMe: (data) => api.put('/auth/me', data)
+  updateMe: (data) => api.put('/auth/me', data),
+  // Profil santé (table users) lié au compte connecté
+  getProfile: () => api.get('/auth/me/profile'),
+  updateProfile: (data) => api.put('/auth/me/profile', data)
 }
 
 export const usersAPI = {

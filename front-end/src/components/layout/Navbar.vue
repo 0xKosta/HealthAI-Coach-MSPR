@@ -4,10 +4,10 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="relative flex items-center h-20 sm:h-16 w-full">
 
-        <!-- Logo — centré mobile, à gauche desktop -->
+        <!-- Logo — aligné à gauche -->
         <RouterLink
           :to="homeLink"
-          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:static sm:translate-x-0 sm:translate-y-0 flex items-center"
+          class="flex items-center"
         >
           <img
             src="/healthai-coach-logo-light-navbar-text-subtitle-big.svg"
@@ -37,9 +37,18 @@
         <!-- Compte + déconnexion -->
         <div class="ml-auto flex items-center gap-3 relative z-10">
           <span v-if="auth.currentUser" class="hidden md:block text-xs text-slate-300">
-            {{ auth.currentUser.first_name }} {{ auth.currentUser.last_name }}
+            {{ auth.currentUser.first_name }}
             <span v-if="auth.isAdmin" class="ml-1 px-1.5 py-0.5 rounded bg-brand-accent/20 text-brand-accent text-[10px] font-semibold uppercase">Admin</span>
           </span>
+          <RouterLink
+            v-if="!auth.isAdmin && auth.profileId"
+            :to="`/dashboard/${auth.profileId}/profile`"
+            class="flex items-center justify-center w-9 h-9 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+            title="Mon profil"
+            aria-label="Modifier mon profil"
+          >
+            <span class="material-symbols-outlined text-[20px] leading-none">settings</span>
+          </RouterLink>
           <button
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
             @click="logout"

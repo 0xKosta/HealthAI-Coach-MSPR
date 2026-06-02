@@ -4,6 +4,7 @@
 import logging
 import os
 from datetime import datetime, timedelta
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models import User, UserAuth
+from api.schemas import UserResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -302,3 +304,88 @@ def update_me(
         avatar_url=current_user.avatar_url,
         user_id=current_user.user_id,
     )
+
+
+# =============================================================================
+# PROFIL SANTÉ DE L'UTILISATEUR CONNECTÉ (table users liée)
+# Sécurisé : on ne touche QUE le profil lié au compte du token.
+# =============================================================================
+
+class ProfileUpdateRequest(BaseModel):
+    """Champs santé éditables par l'utilisateur. Bornes alignées sur les CHECK BDD."""
+
+    age: Optional[int] = Field(None, ge=0, le=120)
+    gender: Optional[Literal["male", "female", "other"]] = None
+    weight_kg: Optional[float] = Field(None, gt=0)
+    height_cm: Optional[float] = Field(None, gt=0)
+    body_fat_pct: Optional[float] = Field(None, ge=0, le=100)
+    goal: Optional[Literal[
+        "weight_loss", "muscle_gain", "sleep_improvement", "maintenance"
+    ]] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "age": 30,
+                "gender": "female",
+                "weight_kg": 65.0,
+                "height_cm": 170.0,
+                "body_fat_pct": 22.0,
+                "goal": "maintenance",
+            }
+        }
+
+
+def _get_linked_profile(current_user: UserAuth, db: Session) -> User:
+    """Retourne le profil users lié au compte connecté, ou lève une 404."""
+    if not current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucun profil santé n'est lié à ce compte.",
+        )
+    profile = db.query(User).filter(User.id == current_user.user_id).first()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profil santé introuvable.",
+        )
+    return profile
+
+
+@router.get(
+    "/me/profile",
+    response_model=UserResponse,
+    summary="Récupérer le profil santé de l'utilisateur connecté",
+)
+def get_my_profile(
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    return _get_linked_profile(current_user, db)
+
+
+@router.put(
+    "/me/profile",
+    response_model=UserResponse,
+    summary="Mettre à jour son profil santé (IMC recalculé automatiquement)",
+)
+def update_my_profile(
+    payload: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    profile = _get_linked_profile(current_user, db)
+
+    for field, value in payload.model_dump().items():
+        setattr(profile, field, value)
+
+    # IMC = poids(kg) / taille(m)² — recalculé serveur pour rester cohérent
+    if profile.weight_kg and profile.height_cm:
+        height_m = profile.height_cm / 100
+        profile.bmi = round(profile.weight_kg / (height_m * height_m), 2)
+    else:
+        profile.bmi = None
+
+    db.commit()
+    db.refresh(profile)
+    return profile

@@ -7,6 +7,16 @@
   body { @apply bg-brand-light text-brand-text font-sans; }
 }
 
+/* Mobile uniquement (< sm) : neutralise le geste "retour" par swipe horizontal
+   du navigateur, qui faisait clignoter les navbars lors d'un swipe vers la droite.
+   Aucun impact desktop. */
+@media (max-width: 639px) {
+  html,
+  body {
+    overscroll-behavior-x: contain;
+  }
+}
+
 @layer components {
   /* Boutons */
   .btn-primary {

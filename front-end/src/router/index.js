@@ -8,8 +8,10 @@ import TrendsUsersView from '@/views/TrendsUsersView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import NoProfileView from '@/views/NoProfileView.vue'
+import ProfileEditView from '@/views/ProfileEditView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { resolvePostAuthRoute } from '@/router/redirect'
+import { updateTransition } from '@/router/transition'
 
 const routes = [
   // — Auth (accessible uniquement aux visiteurs non connectés) —
@@ -21,6 +23,7 @@ const routes = [
   { path: '/dashboard/:userId/nutrition', name: 'Nutrition',     component: NutritionView, meta: { requiresAuth: true } },
   { path: '/dashboard/:userId/workout',   name: 'Workout',       component: WorkoutView,   meta: { requiresAuth: true } },
   { path: '/dashboard/:userId/trends',    name: 'Trends',        component: TrendsView,    meta: { requiresAuth: true } },
+  { path: '/dashboard/:userId/profile',   name: 'Profile',       component: ProfileEditView, meta: { requiresAuth: true } },
   { path: '/exercises',                   name: 'Exercises',     component: ExercisesView, meta: { requiresAuth: true } },
   { path: '/no-profile',                  name: 'NoProfile',     component: NoProfileView, meta: { requiresAuth: true } },
 
@@ -86,6 +89,11 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+// Détermine le sens de l'animation (horizontal) selon l'ordre des vues partagées.
+router.afterEach((to, from) => {
+  updateTransition(to, from)
 })
 
 export default router
