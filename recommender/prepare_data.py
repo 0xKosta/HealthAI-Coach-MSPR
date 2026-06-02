@@ -66,6 +66,7 @@ def prepare():
         "encoders": encoders,
         "features": FEATURES,
     }
+    DATA_OUT.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(bundle, DATA_OUT)
     print(f"OK -> {len(X)} lignes | train={len(X_train)} test={len(X_test)}")
     print(f"Classes : {sorted(y.unique())}")
