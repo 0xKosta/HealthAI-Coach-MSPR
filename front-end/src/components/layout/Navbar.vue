@@ -36,9 +36,15 @@
 
         <!-- Compte + déconnexion -->
         <div class="ml-auto flex items-center gap-3 relative z-10">
-          <span v-if="auth.currentUser" class="hidden md:block text-xs text-slate-300">
-            {{ auth.currentUser.first_name }}
-            <span v-if="auth.isAdmin" class="ml-1 px-1.5 py-0.5 rounded bg-brand-accent/20 text-brand-accent text-[10px] font-semibold uppercase">Admin</span>
+          <span
+            v-if="auth.currentUser"
+            class="hidden md:flex items-center gap-2 text-xs text-slate-300"
+          >
+            <span>{{ auth.currentUser.first_name }}</span>
+            <PlanBadge
+              :plan="auth.plan"
+              :role="auth.currentUser.role"
+            />
           </span>
           <RouterLink
             v-if="!auth.isAdmin && auth.profileId"
@@ -86,6 +92,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import PlanBadge from '@/components/ui/PlanBadge.vue'
 
 const route = useRoute()
 const router = useRouter()

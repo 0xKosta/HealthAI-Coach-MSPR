@@ -38,8 +38,13 @@
             >
               {{ hasInvalidProfile ? 'Profil à corriger' : 'Bienvenue' }}
             </p>
-            <h2 class="text-2xl font-bold text-brand-primary">
+            <h2 class="text-2xl font-bold text-brand-primary flex flex-wrap items-center gap-2">
               Bonjour {{ displayName }} 👋
+              <PlanBadgeLight
+                v-if="!isAdminScope && auth.currentUser"
+                :plan="auth.plan"
+                :role="auth.currentUser.role"
+              />
             </h2>
             <p class="text-slate-600 mt-2 max-w-xl">
               <template v-if="hasInvalidProfile">
@@ -149,7 +154,14 @@
               </svg>
             </div>
             <div>
-              <h2 class="text-xl font-bold text-brand-primary">{{ displayName }}</h2>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-xl font-bold text-brand-primary">{{ displayName }}</h2>
+                <PlanBadgeLight
+                  v-if="!isAdminScope && auth.currentUser"
+                  :plan="auth.plan"
+                  :role="auth.currentUser.role"
+                />
+              </div>
               <span v-if="user.goal" :class="goalBadgeClass">{{ goalLabel }}</span>
               <span v-else class="badge-warning text-xs">Objectif à définir</span>
             </div>
@@ -241,11 +253,11 @@
       </div>
 
       <!-- Conseil IA -->
-      <div class="card" :class="{ 'opacity-75': profileBlocksAi }">
+      <div class="card" :class="{ 'opacity-75': aiBlocked }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div class="flex items-start gap-3">
             <div
-              v-if="profileBlocksAi"
+              v-if="aiBlocked"
               class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"
             >
               <span class="material-symbols-outlined text-[22px] text-slate-500">lock</span>
@@ -271,7 +283,7 @@
             {{ hasInvalidProfile ? 'Corriger le profil' : 'Débloquer le conseil IA' }}
           </RouterLink>
           <button
-            v-else
+            v-else-if="!aiBlocked"
             @click="fetchAdvice"
             :disabled="adviceLoading"
             class="btn-primary shrink-0"
@@ -284,7 +296,7 @@
           </button>
         </div>
 
-        <template v-if="!profileBlocksAi">
+        <template v-if="!aiBlocked">
           <ErrorAlert v-if="adviceError" :message="adviceError" />
 
           <div v-if="!advice && !adviceLoading && !adviceError"
@@ -321,6 +333,8 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useDisplayName } from '@/composables/useDisplayName'
+import { useAuthStore } from '@/stores/authStore'
+import PlanBadgeLight from '@/components/ui/PlanBadgeLight.vue'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import {
   isProfileIncomplete as checkProfileIncomplete,
@@ -332,6 +346,7 @@ import {
   PROFILE_AI_REQUIRED_MSG,
   PROFILE_INVALID_MSG,
 } from '@/composables/useProfileCompletion'
+import { useAiGate, PLAN_AI_REQUIRED_MSG } from '@/composables/useAiAccess'
 import { parseApiErrorDetail, validateBiometricForm } from '@/composables/useBiometricValidation'
 import { useViewNav } from '@/composables/useViewNav'
 import { coachAPI, usersAPI } from '@/services/api'
@@ -342,6 +357,7 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
+const auth = useAuthStore()
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -360,9 +376,11 @@ const profileIssues = computed(() => getProfileIssues(activeUser.value))
 const hasInvalidProfile = computed(() => hasInvalidProfileData(activeUser.value))
 const needsProfileAttention = computed(() => showProfileWelcomeBoard(activeUser.value))
 const profileBlocksAi = computed(() => blocksAiFeatures(activeUser.value))
+const { planBlocksAi, aiBlocked } = useAiGate(activeUser)
 const profileAiLockHint = computed(() => {
   if (hasInvalidProfile.value) return PROFILE_INVALID_MSG
   if (checkProfileIncomplete(activeUser.value)) return PROFILE_AI_REQUIRED_MSG
+  if (planBlocksAi.value) return PLAN_AI_REQUIRED_MSG
   return 'Analyse IA basée sur votre profil complet'
 })
 
@@ -439,7 +457,7 @@ function goToUsersList() {
   router.push(isAdminScope.value ? '/admin' : '/')
 }
 
-watch(profileBlocksAi, (blocked) => {
+watch(aiBlocked, (blocked) => {
   if (blocked) {
     advice.value = ''
     adviceError.value = ''
@@ -526,7 +544,7 @@ const healthScore = computed(() => {
 })
 
 async function fetchAdvice() {
-  if (!user.value || profileBlocksAi.value) return
+  if (!user.value || aiBlocked.value) return
   adviceLoading.value = true; adviceError.value = ''; advice.value = ''
   try {
     const res = await coachAPI.getAdvice(user.value.id)

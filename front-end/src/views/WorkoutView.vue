@@ -6,10 +6,12 @@
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Programme d'Entraînement</h1>
         <p class="text-slate-600 mt-1">
-          {{ profileBlocksAi
-            ? (hasInvalidProfile
-              ? 'Corrigez votre profil pour générer un programme IA'
-              : 'Complétez votre profil pour générer un programme personnalisé')
+          {{ aiBlocked
+            ? (planBlocksAi
+              ? 'Passez à Premium pour générer un programme IA'
+              : (hasInvalidProfile
+                ? 'Corrigez votre profil pour générer un programme IA'
+                : 'Complétez votre profil pour générer un programme personnalisé'))
             : 'Générez un plan IA personnalisé selon votre profil et vos objectifs' }}
         </p>
       </div>
@@ -24,12 +26,14 @@
     <ErrorAlert v-else-if="userError" :message="userError" />
 
     <ProfileAiGate
-      v-if="currentUser && profileBlocksAi"
-      title="Génération de programme verrouillée"
-      :description="profileGateDescription"
-      :issues="profileIssues"
-      :profile-edit-path="profileEditPath"
-      :cta-label="hasInvalidProfile ? 'Corriger le profil' : (isAdminScope ? 'Modifier le profil' : 'Compléter mon profil')"
+      v-if="currentUser && aiBlocked"
+      :title="aiGateTitle"
+      :description="aiGateDescription"
+      :issues="profileBlocksAi ? profileIssues : []"
+      :profile-edit-path="profileBlocksAi ? profileEditPath : ''"
+      :cta-label="profileBlocksAi
+        ? (hasInvalidProfile ? 'Corriger le profil' : (isAdminScope ? 'Modifier le profil' : 'Compléter mon profil'))
+        : ''"
     />
 
     <!-- Formulaire de configuration -->
@@ -85,7 +89,7 @@
     <ErrorAlert v-if="planError" :message="planError" />
 
     <!-- Résultat programme IA -->
-    <div v-if="plan && !profileBlocksAi" class="card animate-slide-up">
+    <div v-if="plan && !aiBlocked" class="card animate-slide-up">
       <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="text-xl font-bold text-brand-primary">Votre programme</h2>
@@ -113,14 +117,11 @@ import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
 import { useDisplayName } from '@/composables/useDisplayName'
 import {
-  isProfileIncomplete,
   getProfileEditPath,
-  blocksAiFeatures,
   hasInvalidProfileData,
   getProfileIssues,
-  PROFILE_AI_REQUIRED_MSG,
-  PROFILE_INVALID_MSG,
 } from '@/composables/useProfileCompletion'
+import { useAiGate } from '@/composables/useAiAccess'
 import { parseApiErrorDetail } from '@/composables/useBiometricValidation'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
@@ -144,14 +145,11 @@ const generating = ref(false)
 const planError = ref('')
 const plan = ref(null)
 
-const profileIncomplete = computed(() => isProfileIncomplete(currentUser.value))
-const profileBlocksAi = computed(() => blocksAiFeatures(currentUser.value))
 const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
 const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
 const profileIssues = computed(() => getProfileIssues(currentUser.value))
-const profileGateDescription = computed(() =>
-  hasInvalidProfile.value ? PROFILE_INVALID_MSG : PROFILE_AI_REQUIRED_MSG
-)
+const { profileBlocksAi, planBlocksAi, aiBlocked, aiGateTitle, aiGateDescription } =
+  useAiGate(currentUser)
 const displayName = useDisplayName(currentUser)
 
 const equipmentOptions = [
@@ -177,7 +175,7 @@ const daysLabel = computed(() => {
 })
 
 async function generatePlan() {
-  if (!activeUserId.value || profileBlocksAi.value) return
+  if (!activeUserId.value || aiBlocked.value) return
   generating.value = true; planError.value = ''; plan.value = null
   try {
     const res = await coachAPI.getWorkoutPlan(activeUserId.value, form.value.equipment, form.value.daysPerWeek)
@@ -202,7 +200,7 @@ async function loadUserProfile() {
     const res = await usersAPI.getById(activeUserId.value)
     currentUser.value = res.data
     userStore.selectUser(activeUserId.value)
-    if (profileBlocksAi.value) {
+    if (aiBlocked.value) {
       plan.value = null
     }
   } catch (e) {

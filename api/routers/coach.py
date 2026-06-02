@@ -16,6 +16,8 @@ from api.database import get_db
 from api.models import User, UserAuth, BiometricMetric, WorkoutSession
 
 from api.biometrics import validate_user_biometrics
+from api.permissions import AI_PREMIUM_REQUIRED_DETAIL, can_use_ai
+from api.routers.auth import get_current_user
 from api.coach_utils import (
     advice_cache, workout_cache, trend_cache, meal_cache,
     coach_limiter,
@@ -32,6 +34,25 @@ router = APIRouter()
 # =============================================================================
 # UTILITAIRE INTERNE
 # =============================================================================
+
+def _resolve_coach_user(
+    account: UserAuth,
+    target_user_id: int,
+    db: Session,
+) -> User:
+    """Auth obligatoire, plan Premium (ou rôle admin/demo), accès au bon profil."""
+    if not can_use_ai(account.role, account.plan):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=AI_PREMIUM_REQUIRED_DETAIL,
+        )
+    if account.role != "admin" and account.user_id != target_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas utiliser le coach IA pour ce profil.",
+        )
+    return _get_user_or_404(target_user_id, db)
+
 
 def _get_user_or_404(user_id: int, db: Session) -> User:
     """Récupère un utilisateur par son ID ou lève une 404."""
@@ -274,8 +295,12 @@ class MealPlanResponse(BaseModel):
         "à partir du profil et de la dernière mesure biométrique de l'utilisateur."
     ),
 )
-def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
-    user = _get_user_or_404(payload.user_id, db)
+def get_ai_advice(
+    payload: CoachRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    user = _resolve_coach_user(current_user, payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
     display_name = _get_user_display_name(user, db)
 
@@ -353,8 +378,12 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
         "et un conseil nutritionnel adapté à l'objectif de l'utilisateur."
     ),
 )
-def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
-    user = _get_user_or_404(payload.user_id, db)
+def analyze_photo(
+    payload: PhotoRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    user = _resolve_coach_user(current_user, payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
     display_name = _get_user_display_name(user, db)
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
@@ -469,8 +498,12 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
         "et au nombre de séances souhaité."
     ),
 )
-def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
-    user = _get_user_or_404(payload.user_id, db)
+def get_workout_plan(
+    payload: WorkoutRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    user = _resolve_coach_user(current_user, payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
     display_name = _get_user_display_name(user, db)
 
@@ -550,8 +583,12 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
         "et à ses allergies ou intolérances alimentaires."
     ),
 )
-def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
-    user = _get_user_or_404(payload.user_id, db)
+def get_meal_plan(
+    payload: MealPlanRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    user = _resolve_coach_user(current_user, payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
     display_name = _get_user_display_name(user, db)
 
@@ -625,8 +662,12 @@ def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
         "avec des conseils adaptés à l'objectif."
     ),
 )
-def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
-    user = _get_user_or_404(payload.user_id, db)
+def get_biometric_trend(
+    payload: CoachRequest,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    user = _resolve_coach_user(current_user, payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
     display_name = _get_user_display_name(user, db)
 

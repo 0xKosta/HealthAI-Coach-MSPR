@@ -166,20 +166,69 @@ def _mock_openai_response(text: str):
     return mock_response
 
 
-def test_coach_advice_user_not_found(client):
-    response = client.post("/coach/advice", json={"user_id": 99999})
+def test_coach_advice_requires_auth(client, created_user):
+    response = client.post("/coach/advice", json={"user_id": created_user["id"]})
+    assert response.status_code == 401
+
+
+def test_coach_advice_free_plan_forbidden(client, created_user):
+    from tests.conftest import TestingSessionLocal
+    from api.models import UserAuth
+    from api.routers.auth import create_token, hash_password
+
+    db = TestingSessionLocal()
+    account = (
+        db.query(UserAuth).filter(UserAuth.user_id == created_user["id"]).first()
+    )
+    if not account:
+        account = UserAuth(
+            user_id=created_user["id"],
+            email="free.coach@test.local",
+            password_hash=hash_password("testpass"),
+            first_name="Free",
+            last_name="User",
+            role="user",
+            plan="free",
+        )
+        db.add(account)
+    else:
+        account.plan = "free"
+        account.role = "user"
+    db.commit()
+    db.refresh(account)
+    headers = {"Authorization": f"Bearer {create_token(account.id)}"}
+    db.close()
+
+    response = client.post(
+        "/coach/advice",
+        json={"user_id": created_user["id"]},
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert "premium" in response.json()["detail"].lower()
+
+
+def test_coach_advice_user_not_found(client, admin_auth_headers):
+    response = client.post(
+        "/coach/advice",
+        json={"user_id": 99999},
+        headers=admin_auth_headers,
+    )
     assert response.status_code == 404
 
 
-def test_coach_advice_success(client, created_user):
+def test_coach_advice_success(client, created_user, premium_auth_headers):
     mock_resp = _mock_openai_response("Continuez vos efforts, vous êtes sur la bonne voie !")
     with patch("api.routers.coach.client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_resp
-        response = client.post("/coach/advice", json={"user_id": created_user["id"]})
+        response = client.post(
+            "/coach/advice",
+            json={"user_id": created_user["id"]},
+            headers=premium_auth_headers,
+        )
     assert response.status_code == 200
     data = response.json()
     assert data["user_id"] == created_user["id"]
-    assert data["user_name"] == created_user["name"]
     assert "advice" in data
     assert len(data["advice"]) > 0
 
@@ -188,21 +237,32 @@ def test_coach_advice_uses_auth_first_name(client, created_user):
     """Le prompt IA doit utiliser le prénom user_auth, pas User_XXXXXX."""
     from tests.conftest import TestingSessionLocal
     from api.models import User, UserAuth
-    from api.routers.auth import hash_password
+    from api.routers.auth import create_token, hash_password
 
     db = TestingSessionLocal()
     profile = db.query(User).filter(User.id == created_user["id"]).first()
     profile.name = "User_000099"
-    db.add(
-        UserAuth(
+    account = (
+        db.query(UserAuth).filter(UserAuth.user_id == profile.id).first()
+    )
+    if not account:
+        account = UserAuth(
             user_id=profile.id,
             email="alice.coach@test.local",
             password_hash=hash_password("testpass"),
             first_name="Alice",
             last_name="Martin",
+            role="user",
+            plan="premium",
         )
-    )
+        db.add(account)
+    else:
+        account.first_name = "Alice"
+        account.plan = "premium"
+        account.role = "user"
     db.commit()
+    db.refresh(account)
+    headers = {"Authorization": f"Bearer {create_token(account.id)}"}
     db.close()
 
     from api.routers import coach as coach_module
@@ -211,7 +271,11 @@ def test_coach_advice_uses_auth_first_name(client, created_user):
     mock_resp = _mock_openai_response("Bonjour Alice !")
     with patch("api.routers.coach.client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_resp
-        response = client.post("/coach/advice", json={"user_id": created_user["id"]})
+        response = client.post(
+            "/coach/advice",
+            json={"user_id": created_user["id"]},
+            headers=headers,
+        )
     assert response.status_code == 200
     data = response.json()
     assert data["user_name"] == "Alice"
@@ -221,7 +285,7 @@ def test_coach_advice_uses_auth_first_name(client, created_user):
     assert "tutoyant" in prompt.lower() or "tu " in prompt.lower()
 
 
-def test_coach_workout_plan_success(client, created_user):
+def test_coach_workout_plan_success(client, created_user, premium_auth_headers):
     mock_resp = _mock_openai_response("## Programme semaine\n**Lundi** : Squat 3x10")
     with patch("api.routers.coach.client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_resp
@@ -229,31 +293,36 @@ def test_coach_workout_plan_success(client, created_user):
             "user_id": created_user["id"],
             "equipment": "dumbbell",
             "days_per_week": 3,
-        })
+        }, headers=premium_auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "plan" in data
     assert len(data["plan"]) > 0
 
 
-def test_coach_biometric_trend_no_data(client, created_user):
-    # L'utilisateur n'a pas de métriques dans la fenêtre 30j → 404 attendu
-    # (les métriques créées dans created_metric ont une date d'aujourd'hui,
-    # ce test vérifie le cas sans données)
-    response = client.post("/coach/biometric-trend", json={"user_id": 99999})
+def test_coach_biometric_trend_no_data(client, admin_auth_headers):
+    response = client.post(
+        "/coach/biometric-trend",
+        json={"user_id": 99999},
+        headers=admin_auth_headers,
+    )
     assert response.status_code == 404
 
 
-def test_coach_biometric_trend_success(client, created_user, created_metric):
+def test_coach_biometric_trend_success(client, created_user, created_metric, premium_auth_headers):
     mock_resp = _mock_openai_response("Tendance positive sur le poids. Continuez ainsi.")
     with patch("api.routers.coach.client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_resp
-        response = client.post("/coach/biometric-trend", json={"user_id": created_user["id"]})
+        response = client.post(
+            "/coach/biometric-trend",
+            json={"user_id": created_user["id"]},
+            headers=premium_auth_headers,
+        )
     assert response.status_code == 200
     data = response.json()
     assert "analysis" in data
 
-def test_coach_meal_plan_success(client, created_user):
+def test_coach_meal_plan_success(client, created_user, premium_auth_headers):
     mock_resp = _mock_openai_response(
         "## Plan repas semaine\n**Lundi** : Petit-déj : flocons d'avoine..."
     )
@@ -263,19 +332,19 @@ def test_coach_meal_plan_success(client, created_user):
             "user_id": created_user["id"],
             "budget_euros": 50.0,
             "allergies": ["gluten"],
-        })
+        }, headers=premium_auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "plan" in data
     assert len(data["plan"]) > 0
 
 
-def test_coach_meal_plan_user_not_found(client):
+def test_coach_meal_plan_user_not_found(client, admin_auth_headers):
     response = client.post("/coach/meal-plan", json={
         "user_id": 99999,
         "budget_euros": 50.0,
         "allergies": [],
-    })
+    }, headers=admin_auth_headers)
     assert response.status_code == 404
 
 
@@ -285,19 +354,19 @@ VALID_PNG_B64 = (
 )
 
 
-def test_coach_analyze_photo_rejects_text_base64(client, created_user):
+def test_coach_analyze_photo_rejects_text_base64(client, created_user, premium_auth_headers):
     import base64
 
     text_b64 = base64.b64encode(b"ceci nest pas une image").decode()
     response = client.post("/coach/analyze-photo", json={
         "user_id": created_user["id"],
         "image_base64": text_b64,
-    })
+    }, headers=premium_auth_headers)
     assert response.status_code == 400
     assert "image" in response.json()["detail"].lower()
 
 
-def test_coach_analyze_photo_not_a_meal(client, created_user):
+def test_coach_analyze_photo_not_a_meal(client, created_user, premium_auth_headers):
     mock_resp = _mock_openai_response(json.dumps({
         "is_meal": False,
         "foods_detected": [],
@@ -309,24 +378,24 @@ def test_coach_analyze_photo_not_a_meal(client, created_user):
         response = client.post("/coach/analyze-photo", json={
             "user_id": created_user["id"],
             "image_base64": VALID_PNG_B64,
-        })
+        }, headers=premium_auth_headers)
     assert response.status_code == 422
     assert "repas" in response.json()["detail"].lower()
 
 
-def test_coach_analyze_photo_gpt_refusal(client, created_user):
+def test_coach_analyze_photo_gpt_refusal(client, created_user, premium_auth_headers):
     mock_resp = _mock_openai_response("Je ne peux pas t'aider avec ça.")
     with patch("api.routers.coach.client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_resp
         response = client.post("/coach/analyze-photo", json={
             "user_id": created_user["id"],
             "image_base64": VALID_PNG_B64,
-        })
+        }, headers=premium_auth_headers)
     assert response.status_code == 422
     assert "repas" in response.json()["detail"].lower()
 
 
-def test_coach_analyze_photo_success(client, created_user):
+def test_coach_analyze_photo_success(client, created_user, premium_auth_headers):
     mock_resp = _mock_openai_response(json.dumps({
         "is_meal": True,
         "foods_detected": ["salade"],
@@ -338,7 +407,7 @@ def test_coach_analyze_photo_success(client, created_user):
         response = client.post("/coach/analyze-photo", json={
             "user_id": created_user["id"],
             "image_base64": VALID_PNG_B64,
-        })
+        }, headers=premium_auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["foods_detected"] == ["salade"]

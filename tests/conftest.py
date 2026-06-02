@@ -39,6 +39,68 @@ def client(create_tables):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def premium_auth_headers(created_user):
+    """Compte user_auth Premium lié au profil de test + token JWT."""
+    from api.models import UserAuth
+    from api.routers.auth import create_token, hash_password
+
+    db = TestingSessionLocal()
+    account = (
+        db.query(UserAuth).filter(UserAuth.user_id == created_user["id"]).first()
+    )
+    if not account:
+        account = UserAuth(
+            user_id=created_user["id"],
+            email="premium.coach@test.local",
+            password_hash=hash_password("testpass"),
+            first_name="Premium",
+            last_name="Tester",
+            role="user",
+            plan="premium",
+        )
+        db.add(account)
+    else:
+        account.plan = "premium"
+        account.role = "user"
+    db.commit()
+    db.refresh(account)
+    token = create_token(account.id)
+    db.close()
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_auth_headers(created_user):
+    """Compte admin (IA sans Premium, accès à tout profil)."""
+    from api.models import UserAuth
+    from api.routers.auth import create_token, hash_password
+
+    db = TestingSessionLocal()
+    account = (
+        db.query(UserAuth).filter(UserAuth.user_id == created_user["id"]).first()
+    )
+    if not account:
+        account = UserAuth(
+            user_id=created_user["id"],
+            email="admin.coach@test.local",
+            password_hash=hash_password("testpass"),
+            first_name="Admin",
+            last_name="Coach",
+            role="admin",
+            plan="free",
+        )
+        db.add(account)
+    else:
+        account.role = "admin"
+        account.plan = "free"
+    db.commit()
+    db.refresh(account)
+    token = create_token(account.id)
+    db.close()
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest.fixture(scope="session")
 def created_user(client):
     payload = {

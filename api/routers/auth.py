@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models import User, UserAuth
+from api.permissions import can_use_ai
 from api.biometrics import resolve_bmi, validate_user_biometrics
 from api.schemas import ProfileUpdateRequest, UserResponse
 
@@ -109,6 +110,23 @@ class MeResponse(BaseModel):
     last_name: str
     avatar_url: str | None
     user_id: int | None  # Profil santé lié (users.id) — null si compte sans profil
+    role: str  # user | admin | demo
+    plan: str  # free | premium | premium_plus
+    can_use_ai: bool  # dérivé de role + plan
+
+
+def _me_response(account: UserAuth) -> MeResponse:
+    return MeResponse(
+        id=account.id,
+        email=account.email,
+        first_name=account.first_name,
+        last_name=account.last_name,
+        avatar_url=account.avatar_url,
+        user_id=account.user_id,
+        role=account.role,
+        plan=account.plan,
+        can_use_ai=can_use_ai(account.role, account.plan),
+    )
 
 
 # =============================================================================
@@ -146,6 +164,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             password_hash=hash_password(payload.password),
             first_name=payload.first_name,
             last_name=payload.last_name,
+            role="user",
+            plan="free",
         )
         db.add(account)
         db.commit()
@@ -186,14 +206,7 @@ def login(
     summary="Profil de l'utilisateur connecté",
 )
 def me(current_user: UserAuth = Depends(get_current_user)):
-    return MeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        avatar_url=current_user.avatar_url,
-        user_id=current_user.user_id,
-    )
+    return _me_response(current_user)
     
 # =============================================================================
 # SCHÉMAS supplémentaires
@@ -296,14 +309,7 @@ def update_me(
     db.commit()
     db.refresh(current_user)
 
-    return MeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        avatar_url=current_user.avatar_url,
-        user_id=current_user.user_id,
-    )
+    return _me_response(current_user)
 
 
 # =============================================================================

@@ -256,8 +256,18 @@ class UserAuth(Base):
     first_name: Mapped[str] = mapped_column(String(50), nullable=False)
     last_name: Mapped[str] = mapped_column(String(50), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(Text, default=None)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, server_default="user")
+    plan: Mapped[str] = mapped_column(String(20), nullable=False, server_default="free")
     created_at: Mapped[date] = mapped_column(
         Date, nullable=False, server_default=func.current_date()
+    )
+
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'admin', 'demo')", name="ck_user_auth_role"),
+        CheckConstraint(
+            "plan IN ('free', 'premium', 'premium_plus')",
+            name="ck_user_auth_plan",
+        ),
     )
 
     posts: Mapped[list["Post"]] = relationship(

@@ -2,10 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authAPI, TOKEN_KEY } from '@/services/api'
 
-// Comptes considérés comme administrateurs (accès /admin).
-// MSPR : pas de colonne de rôle en base, on se base sur l'email.
-const ADMIN_EMAILS = ['admin@healthai-coach.demo']
-
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem(TOKEN_KEY) || '')
   const currentUser = ref(null)
@@ -13,9 +9,9 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref('')
 
   const isAuthenticated = computed(() => !!token.value)
-  const isAdmin = computed(() =>
-    !!currentUser.value && ADMIN_EMAILS.includes(currentUser.value.email)
-  )
+  const isAdmin = computed(() => currentUser.value?.role === 'admin')
+  const canUseAi = computed(() => !!currentUser.value?.can_use_ai)
+  const plan = computed(() => currentUser.value?.plan ?? 'free')
   // Profil santé lié (users.id) — cible du dashboard utilisateur
   const profileId = computed(() => currentUser.value?.user_id ?? null)
 
@@ -99,6 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     isAuthenticated,
     isAdmin,
+    canUseAi,
+    plan,
     profileId,
     login,
     register,

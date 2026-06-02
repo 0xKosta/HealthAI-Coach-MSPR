@@ -14,12 +14,14 @@
     <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
 
     <ProfileAiGate
-      v-if="currentUser && profileBlocksAi"
-      title="Analyse des tendances verrouillée"
-      :description="profileGateDescription"
-      :issues="profileIssues"
-      :profile-edit-path="profileEditPath"
-      :cta-label="hasInvalidProfile ? 'Corriger le profil' : 'Compléter mon profil'"
+      v-if="currentUser && aiBlocked && !userMetrics.length"
+      :title="aiGateTitle"
+      :description="aiGateDescription"
+      :issues="profileBlocksAi ? profileIssues : []"
+      :profile-edit-path="profileBlocksAi ? profileEditPath : ''"
+      :cta-label="profileBlocksAi
+        ? (hasInvalidProfile ? 'Corriger le profil' : 'Compléter mon profil')
+        : ''"
     />
 
     <LoadingSpinner v-if="metricsLoading" message="Chargement des métriques..." />
@@ -199,13 +201,11 @@ import {
   canUnlockTrendAnalysis,
 } from '@/composables/useBiometricTrends'
 import {
-  blocksAiFeatures,
   getProfileEditPath,
   getProfileIssues,
   hasInvalidProfileData,
-  PROFILE_AI_REQUIRED_MSG,
-  PROFILE_INVALID_MSG,
 } from '@/composables/useProfileCompletion'
+import { useAiGate, PLAN_AI_REQUIRED_MSG } from '@/composables/useAiAccess'
 import { metricsAPI, coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -229,12 +229,10 @@ const currentUser = ref(null)
 const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
 
 const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
-const profileBlocksAi = computed(() => blocksAiFeatures(currentUser.value))
 const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
 const profileIssues = computed(() => getProfileIssues(currentUser.value))
-const profileGateDescription = computed(() =>
-  hasInvalidProfile.value ? PROFILE_INVALID_MSG : PROFILE_AI_REQUIRED_MSG
-)
+const { profileBlocksAi, planBlocksAi, aiBlocked, aiGateTitle, aiGateDescription } =
+  useAiGate(currentUser)
 const userMetrics = computed(() =>
   allMetrics.value
     .slice()
@@ -244,9 +242,10 @@ const userMetrics = computed(() =>
 
 const distinctMetricDays = computed(() => countDistinctMetricDays(userMetrics.value))
 const canAnalyzeTrends = computed(() => canUnlockTrendAnalysis(userMetrics.value))
-const canRunTrendAi = computed(() => canAnalyzeTrends.value && !profileBlocksAi.value)
+const canRunTrendAi = computed(() => canAnalyzeTrends.value && !aiBlocked.value)
 const trendAiLockHint = computed(() => {
-  if (profileBlocksAi.value) return profileGateDescription.value
+  if (profileBlocksAi.value) return aiGateDescription.value
+  if (planBlocksAi.value) return PLAN_AI_REQUIRED_MSG
   if (!canAnalyzeTrends.value) {
     return `Disponible après ${MIN_TREND_ANALYSIS_DAYS} jours de données synchronisées`
   }

@@ -5,10 +5,12 @@
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Analyse Nutritionnelle</h1>
         <p class="text-slate-600 mt-1">
-          {{ profileBlocksAi
-            ? (hasInvalidProfile
-              ? 'Corrigez votre profil pour activer l\'analyse photo IA'
-              : 'Complétez votre profil pour activer l\'analyse photo IA')
+          {{ aiBlocked
+            ? (planBlocksAi
+              ? 'Passez à Premium pour analyser vos repas par photo'
+              : (hasInvalidProfile
+                ? 'Corrigez votre profil pour activer l\'analyse photo IA'
+                : 'Complétez votre profil pour activer l\'analyse photo IA'))
             : "Analysez un repas par photo grâce à l'IA vision" }}
         </p>
       </div>
@@ -23,12 +25,14 @@
     <ErrorAlert v-else-if="userError" :message="userError" />
 
     <ProfileAiGate
-      v-if="currentUser && profileBlocksAi"
-      :title="hasInvalidProfile ? 'Analyse nutritionnelle verrouillée' : 'Analyse nutritionnelle verrouillée'"
-      :description="profileGateDescription"
-      :issues="profileIssues"
-      :profile-edit-path="profileEditPath"
-      :cta-label="hasInvalidProfile ? 'Corriger le profil' : (isAdminScope ? 'Modifier le profil' : 'Compléter mon profil')"
+      v-if="currentUser && aiBlocked"
+      :title="aiGateTitle"
+      :description="aiGateDescription"
+      :issues="profileBlocksAi ? profileIssues : []"
+      :profile-edit-path="profileBlocksAi ? profileEditPath : ''"
+      :cta-label="profileBlocksAi
+        ? (hasInvalidProfile ? 'Corriger le profil' : (isAdminScope ? 'Modifier le profil' : 'Compléter mon profil'))
+        : ''"
     />
 
     <!-- Zone upload -->
@@ -89,7 +93,7 @@
 
     <ErrorAlert v-if="error" :message="error" />
 
-    <template v-if="result && !profileBlocksAi">
+    <template v-if="result && !aiBlocked">
       <!-- Aliments détectés -->
       <div class="card animate-slide-up">
         <h2 class="text-xl font-bold text-brand-primary mb-4">Aliments détectés</h2>
@@ -126,14 +130,11 @@ import { useUserStore } from '@/stores/userStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
 import {
-  isProfileIncomplete,
   getProfileEditPath,
-  blocksAiFeatures,
   hasInvalidProfileData,
   getProfileIssues,
-  PROFILE_AI_REQUIRED_MSG,
-  PROFILE_INVALID_MSG,
 } from '@/composables/useProfileCompletion'
+import { useAiGate, PLAN_AI_REQUIRED_MSG } from '@/composables/useAiAccess'
 import { parseApiErrorDetail } from '@/composables/useBiometricValidation'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
@@ -159,14 +160,11 @@ const analyzing = ref(false)
 const error = ref('')
 const result = ref(null)
 
-const profileIncomplete = computed(() => isProfileIncomplete(currentUser.value))
-const profileBlocksAi = computed(() => blocksAiFeatures(currentUser.value))
 const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
 const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
 const profileIssues = computed(() => getProfileIssues(currentUser.value))
-const profileGateDescription = computed(() =>
-  hasInvalidProfile.value ? PROFILE_INVALID_MSG : PROFILE_AI_REQUIRED_MSG
-)
+const { profileBlocksAi, planBlocksAi, aiBlocked, aiGateTitle, aiGateDescription } =
+  useAiGate(currentUser)
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -233,7 +231,7 @@ async function loadUserProfile() {
     const res = await usersAPI.getById(activeUserId.value)
     currentUser.value = res.data
     userStore.selectUser(activeUserId.value)
-    if (profileBlocksAi.value) {
+    if (aiBlocked.value) {
       clearImage()
     }
   } catch (e) {
@@ -254,7 +252,7 @@ function goToUsersList() {
 }
 
 async function analyzePhoto() {
-  if (!imageBase64.value || !activeUserId.value || profileBlocksAi.value) return
+  if (!imageBase64.value || !activeUserId.value || aiBlocked.value) return
   analyzing.value = true; error.value = ''; result.value = null
   try {
     const res = await coachAPI.analyzePhoto(activeUserId.value, imageBase64.value)
@@ -262,7 +260,9 @@ async function analyzePhoto() {
   } catch (e) {
     const detail = parseApiErrorDetail(e.response?.data?.detail)
     const status = e.response?.status
-    if (status === 422) {
+    if (status === 403) {
+      error.value = detail || PLAN_AI_REQUIRED_MSG
+    } else if (status === 422) {
       error.value =
         detail ||
         "Cette image ne correspond pas à un repas. Choisissez une photo de votre assiette ou de vos aliments."
