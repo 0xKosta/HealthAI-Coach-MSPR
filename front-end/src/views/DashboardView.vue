@@ -49,9 +49,9 @@
             <h2 class="text-2xl font-bold text-brand-primary flex flex-wrap items-center gap-2">
               Bonjour {{ displayName }} 👋
               <PlanBadgeLight
-                v-if="!isAdminScope && auth.currentUser"
-                :plan="auth.plan"
-                :role="auth.currentUser.role"
+                v-if="profilePlanBadge"
+                :plan="profilePlanBadge.plan"
+                :role="profilePlanBadge.role"
               />
             </h2>
             <p class="text-slate-600 mt-2 max-w-xl">
@@ -161,17 +161,17 @@
                 <circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" />
               </svg>
             </div>
-            <div>
-              <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-xl font-bold text-brand-primary">{{ displayName }}</h2>
+            <div class="min-w-0">
+              <h2 class="text-xl font-bold text-brand-primary">{{ displayName }}</h2>
+              <div class="flex flex-wrap items-center gap-2 mt-1.5">
                 <PlanBadgeLight
-                  v-if="!isAdminScope && auth.currentUser"
-                  :plan="auth.plan"
-                  :role="auth.currentUser.role"
+                  v-if="profilePlanBadge"
+                  :plan="profilePlanBadge.plan"
+                  :role="profilePlanBadge.role"
                 />
+                <span v-if="user.goal" :class="goalBadgeClass">{{ goalLabel }}</span>
+                <span v-else class="badge-warning text-xs">Objectif à définir</span>
               </div>
-              <span v-if="user.goal" :class="goalBadgeClass">{{ goalLabel }}</span>
-              <span v-else class="badge-warning text-xs">Objectif à définir</span>
             </div>
           </div>
 
@@ -377,6 +377,25 @@ const userError = ref('')
 const user = computed(() => activeUser.value)
 
 const displayName = useDisplayName(activeUser)
+
+/** Badge plan/rôle : compte consulté en admin, ou utilisateur connecté. */
+const profilePlanBadge = computed(() => {
+  if (isAdminScope.value) {
+    const u = activeUser.value
+    if (!u?.plan && !u?.role) return null
+    return {
+      plan: u.plan || 'free',
+      role: u.role || 'user',
+    }
+  }
+  if (auth.currentUser) {
+    return {
+      plan: auth.plan,
+      role: auth.currentUser.role,
+    }
+  }
+  return null
+})
 
 const profileEditPath = computed(() =>
   getProfileEditPath(activeUserId.value, { admin: isAdminScope.value })

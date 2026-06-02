@@ -142,8 +142,11 @@ def _apply_user_payload(user: User, payload: UserCreate) -> None:
     "/",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Créer un utilisateur",
-    description="Crée un nouveau profil utilisateur. L'IMC est recalculé automatiquement côté serveur.",
+    summary="Créer un profil santé seul (admin)",
+    description=(
+        "Réservé aux administrateurs. Préférer POST /auth/admin/users pour un compte "
+        "complet (user_auth + profil vide). Cet endpoint crée uniquement la table users."
+    ),
 )
 def create_user(
     payload: UserCreate,

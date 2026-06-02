@@ -3,10 +3,10 @@
     <div class="flex items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">
-          {{ isAdminProfile ? 'Modifier le profil' : 'Mon profil santé' }}
+          {{ isAdminEdit ? 'Modifier le profil' : 'Mon profil santé' }}
         </h1>
         <p class="text-slate-600 mt-1">
-          <template v-if="isAdminProfile">
+          <template v-if="isAdminEdit">
             {{ adminDisplayName || 'Utilisateur' }} — l'IMC est calculé automatiquement
           </template>
           <template v-else>
@@ -138,7 +138,7 @@
     </form>
 
     <!-- Zone de danger : compte utilisateur -->
-    <div v-if="!loading && !isAdminProfile" class="card border-brand-error/30 bg-brand-error/5">
+    <div v-if="!loading && !isAdminEdit" class="card border-brand-error/30 bg-brand-error/5">
       <h2 class="text-lg font-bold text-brand-error">Supprimer mon compte</h2>
       <p class="text-sm text-slate-600 mt-1">
         Cette action est définitive. Toutes vos données seront supprimées et ne pourront pas être récupérées.
@@ -149,8 +149,8 @@
       </button>
     </div>
 
-    <!-- Zone de danger : profil admin -->
-    <div v-if="!loading && isAdminProfile" class="card border-brand-error/30 bg-brand-error/5">
+    <!-- Zone de danger : profil admin (édition uniquement) -->
+    <div v-if="!loading && isAdminEdit" class="card border-brand-error/30 bg-brand-error/5">
       <h2 class="text-lg font-bold text-brand-error">Supprimer ce profil</h2>
       <p class="text-sm text-slate-600 mt-1">
         Suppression définitive du profil santé, des mesures, séances et historique associés.
@@ -176,7 +176,7 @@
           <h3 class="text-lg font-bold text-brand-primary">{{ confirmTitle }}</h3>
         </div>
         <p class="text-sm text-slate-600">
-          <template v-if="isAdminProfile">
+          <template v-if="isAdminEdit">
             La suppression de <strong>{{ adminDisplayName || `l'utilisateur #${targetUserId}` }}</strong> est
             <strong>définitive</strong>. Toutes les données santé (mesures, séances, historique) seront
             <strong>perdues</strong>.
@@ -219,10 +219,10 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const isAdminProfile = computed(() => route.name === 'AdminProfile')
+const isAdminEdit = computed(() => route.name === 'AdminProfile')
 
 const targetUserId = computed(() => {
-  if (!isAdminProfile.value) return null
+  if (!isAdminEdit.value) return null
   const id = Number(route.params.userId)
   return Number.isFinite(id) ? id : null
 })
@@ -254,14 +254,14 @@ const form = reactive({
 })
 
 const dashboardLink = computed(() => {
-  if (isAdminProfile.value && targetUserId.value) {
+  if (isAdminEdit.value && targetUserId.value) {
     return `/admin/dashboard/${targetUserId.value}`
   }
   return auth.profileId ? `/dashboard/${auth.profileId}` : '/'
 })
 
 const confirmTitle = computed(() =>
-  isAdminProfile.value
+  isAdminEdit.value
     ? 'Supprimer ce profil ?'
     : 'Êtes-vous sûr de supprimer votre compte ?'
 )
@@ -329,7 +329,7 @@ async function loadProfile() {
   loading.value = true
   loadError.value = ''
   try {
-    if (isAdminProfile.value) {
+    if (isAdminEdit.value) {
       if (!targetUserId.value) {
         loadError.value = 'Identifiant utilisateur invalide.'
         return
@@ -347,7 +347,7 @@ async function loadProfile() {
   } catch (e) {
     loadError.value =
       e.response?.status === 404
-        ? (isAdminProfile.value ? 'Profil introuvable.' : "Aucun profil santé lié à ce compte.")
+        ? (isAdminEdit.value ? 'Profil introuvable.' : "Aucun profil santé lié à ce compte.")
         : 'Impossible de charger le profil.'
   } finally {
     loading.value = false
@@ -356,7 +356,7 @@ async function loadProfile() {
 
 function buildPayload() {
   return {
-    name: profileName.value,
+    name: profileName.value.trim(),
     age: clean(form.age),
     gender: clean(form.gender),
     weight_kg: clean(form.weight_kg),
@@ -373,7 +373,7 @@ async function onSubmit() {
   saving.value = true
   try {
     loadedProfileIssues.value = []
-    if (isAdminProfile.value) {
+    if (isAdminEdit.value) {
       await usersAPI.update(targetUserId.value, buildPayload())
     } else {
       await authAPI.updateProfile({
@@ -405,7 +405,7 @@ async function onDelete() {
   deleting.value = true
   deleteError.value = ''
   try {
-    if (isAdminProfile.value) {
+    if (isAdminEdit.value) {
       await usersAPI.delete(targetUserId.value)
       router.push('/admin')
     } else {
@@ -416,7 +416,7 @@ async function onDelete() {
   } catch (e) {
     deleteError.value =
       e.response?.data?.detail ||
-      (isAdminProfile.value
+      (isAdminEdit.value
         ? 'Erreur lors de la suppression du profil.'
         : 'Erreur lors de la suppression du compte.')
     deleting.value = false
@@ -426,7 +426,7 @@ async function onDelete() {
 watch(
   () => route.params.userId,
   () => {
-    if (isAdminProfile.value) loadProfile()
+    if (isAdminEdit.value) loadProfile()
   }
 )
 

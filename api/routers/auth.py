@@ -107,6 +107,25 @@ class RegisterRequest(BaseModel):
         }
 
 
+class AdminCreateAccountRequest(BaseModel):
+    """Mêmes champs que l'inscription — création par un admin."""
+
+    email: EmailStr
+    password: str = Field(..., min_length=6)
+    first_name: str = Field(..., min_length=1, max_length=50)
+    last_name: str = Field(..., min_length=1, max_length=50)
+
+
+class AdminCreateAccountResponse(BaseModel):
+    id: int
+    email: str
+    first_name: str
+    last_name: str
+    user_id: int
+    role: str
+    plan: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -142,6 +161,50 @@ def _me_response(account: UserAuth) -> MeResponse:
 # ENDPOINTS
 # =============================================================================
 
+def _create_account_with_empty_profile(
+    db: Session,
+    *,
+    email: str,
+    password: str,
+    first_name: str,
+    last_name: str,
+    role: str = "user",
+    plan: str = "free",
+) -> UserAuth:
+    """Compte user_auth + profil users vide (comme à l'inscription)."""
+    existing = db.query(UserAuth).filter(UserAuth.email == email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte existe déjà avec cet email.",
+        )
+    try:
+        profile = User(name="")
+        db.add(profile)
+        db.flush()
+        profile.name = f"User_{profile.id:06d}"
+
+        account = UserAuth(
+            user_id=profile.id,
+            email=email,
+            password_hash=hash_password(password),
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+            plan=plan,
+        )
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+        return account
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.post(
     "/register",
     response_model=TokenResponse,
@@ -149,42 +212,49 @@ def _me_response(account: UserAuth) -> MeResponse:
     summary="Créer un compte",
 )
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    existing = db.query(UserAuth).filter(UserAuth.email == payload.email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Un compte existe déjà avec cet email.",
-        )
-
-    # Création couplée, en une seule transaction :
-    #   1. un profil santé `users` VIDE (à compléter ensuite par l'utilisateur)
-    #   2. le compte `user_auth` lié à ce profil (user_id obligatoire en base)
-    try:
-        # Nom au même format que les profils existants : User_000974 (id sur 6 chiffres).
-        # On insère d'abord pour obtenir l'id auto-généré, puis on fixe le nom.
-        profile = User(name="")
-        db.add(profile)
-        db.flush()  # obtient profile.id sans valider la transaction
-        profile.name = f"User_{profile.id:06d}"
-
-        account = UserAuth(
-            user_id=profile.id,
-            email=payload.email,
-            password_hash=hash_password(payload.password),
-            first_name=payload.first_name,
-            last_name=payload.last_name,
-            role="user",
-            plan="free",
-        )
-        db.add(account)
-        db.commit()
-        db.refresh(account)
-    except Exception:
-        db.rollback()
-        raise
-
+    account = _create_account_with_empty_profile(
+        db,
+        email=payload.email,
+        password=payload.password,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+    )
     token = create_token(account.id)
     return TokenResponse(access_token=token)
+
+
+@router.post(
+    "/admin/users",
+    response_model=AdminCreateAccountResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Créer un compte utilisateur (admin)",
+    description=(
+        "Crée un compte user_auth (prénom, nom, email, mot de passe) et un profil "
+        "santé users vide, comme à l'inscription. Les données biométriques se "
+        "complètent ensuite."
+    ),
+)
+def admin_create_user(
+    payload: AdminCreateAccountRequest,
+    db: Session = Depends(get_db),
+    _admin: UserAuth = Depends(require_admin),
+):
+    account = _create_account_with_empty_profile(
+        db,
+        email=payload.email,
+        password=payload.password,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+    )
+    return AdminCreateAccountResponse(
+        id=account.id,
+        email=account.email,
+        first_name=account.first_name,
+        last_name=account.last_name,
+        user_id=account.user_id,
+        role=account.role,
+        plan=account.plan,
+    )
 
 
 @router.post(

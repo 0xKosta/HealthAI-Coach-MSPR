@@ -9,6 +9,7 @@ import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import NoProfileView from '@/views/NoProfileView.vue'
 import ProfileEditView from '@/views/ProfileEditView.vue'
+import AdminUserCreateView from '@/views/AdminUserCreateView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { resolvePostAuthRoute } from '@/router/redirect'
 import { updateTransition } from '@/router/transition'
@@ -29,6 +30,7 @@ const routes = [
 
   // — Back-office admin (connecté + rôle admin) —
   { path: '/admin',                             name: 'AdminUsers',      component: TrendsUsersView, meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/users/new',                   name: 'AdminUserCreate', component: AdminUserCreateView, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId',           name: 'AdminDashboard',  component: DashboardView,   meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId/trends',    name: 'AdminTrends',     component: TrendsView,      meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId/nutrition', name: 'AdminNutrition',  component: NutritionView,   meta: { requiresAuth: true, requiresAdmin: true } },

@@ -5,7 +5,13 @@
         <h1 class="text-3xl font-bold text-brand-primary">Utilisateurs (Admin)</h1>
         <p class="text-slate-600 mt-1">Sélectionnez un profil pour ouvrir son dashboard puis ses tendances biométriques</p>
       </div>
-      <p class="text-sm text-slate-500">{{ totalUsers }} profils</p>
+      <div class="flex flex-wrap items-center gap-3 shrink-0">
+        <p class="text-sm text-slate-500">{{ totalUsers }} profils</p>
+        <RouterLink to="/admin/users/new" class="btn-primary">
+          <span class="material-symbols-outlined text-[18px] leading-none">person_add</span>
+          Ajouter un utilisateur
+        </RouterLink>
+      </div>
     </div>
 
     <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">

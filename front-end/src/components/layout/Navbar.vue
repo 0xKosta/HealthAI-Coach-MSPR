@@ -124,7 +124,11 @@ const navLinks = computed(() => {
 
 function isActive(link) {
   if (link.to === '/admin') {
-    return route.path === '/admin' || route.path.startsWith('/admin/dashboard/')
+    return (
+      route.path === '/admin' ||
+      route.path.startsWith('/admin/dashboard/') ||
+      route.path.startsWith('/admin/users/')
+    )
   }
   if (link.to.startsWith('/dashboard/')) {
     return route.path.startsWith('/dashboard/')
