@@ -33,6 +33,10 @@ data/processed/
 data/interim/
 !tests/fixtures/**
 
+# Photos repas IA (stockage local dev / certif)
+media/ai-photos/*
+!media/ai-photos/.gitkeep
+
 # Logs
 logs/
 *.log

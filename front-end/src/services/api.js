@@ -72,6 +72,11 @@ export const metricsAPI = {
   getByUser: (userId) => api.get(`/metrics/?user_id=${userId}`)
 }
 
+export const aiRequestsAPI = {
+  listByUser: (userId, params = {}) =>
+    api.get('/ai-requests/', { params: { user_id: userId, ...params } }),
+}
+
 export const coachAPI = {
   getAdvice: (userId) => api.post('/coach/advice', { user_id: userId }),
   analyzePhoto: (userId, imageBase64) =>

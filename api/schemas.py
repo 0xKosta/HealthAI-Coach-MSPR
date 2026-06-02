@@ -4,8 +4,8 @@
 #   - XxxCreate  : données acceptées en entrée (POST/PUT) — sans id ni champs auto-générés
 #   - XxxResponse: données renvoyées en sortie (GET)      — avec id, compatible SQLAlchemy
 
-from datetime import date
-from typing import Literal, Optional
+from datetime import date, datetime
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -318,3 +318,36 @@ class BiometricMetricResponse(BiometricMetricCreate):
 
     id: int
     record_date: date                    # Toujours présent en sortie
+
+
+# =============================================================================
+# AI REQUESTS — historique coach IA (admin)
+# =============================================================================
+
+AiRequestType = Literal[
+    "advice",
+    "analyze_photo",
+    "workout_plan",
+    "biometric_trend",
+    "meal_plan",
+]
+
+
+class AiRequestResponse(BaseModel):
+    """Une entrée d'historique IA (GET /ai-requests)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    request_type: str
+    status: str
+    created_at: datetime
+    input_summary: Optional[str] = None
+    output_summary: Optional[str] = None
+    input_json: Optional[dict[str, Any]] = None
+    output_json: Optional[dict[str, Any]] = None
+    photo_path: Optional[str] = None
+    photo_url: Optional[str] = None
+    from_cache: bool = False
+    error_message: Optional[str] = None

@@ -8,8 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routers import users, nutrition, exercises, metrics, coach
-from api.routers import users, nutrition, exercises, metrics, coach, auth, posts
+from api.routers import users, nutrition, exercises, metrics, coach, auth, posts, ai_requests
 
 load_dotenv()
 
@@ -39,6 +38,7 @@ app.include_router(nutrition.router, prefix="/nutrition", tags=["Nutrition"])
 app.include_router(exercises.router, prefix="/exercises", tags=["Exercices"])
 app.include_router(metrics.router,   prefix="/metrics",   tags=["Métriques"])
 app.include_router(coach.router,     prefix="/coach",     tags=["Coach IA"])
+app.include_router(ai_requests.router, prefix="/ai-requests", tags=["Historique IA"])
 app.include_router(auth.router,  prefix="/auth",  tags=["Authentification"])
 app.include_router(posts.router, prefix="/posts", tags=["Feed Social"])
 
@@ -82,6 +82,7 @@ async def biometric_validation_exception_handler(
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 Path("media").mkdir(exist_ok=True)
+Path("media/ai-photos").mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 @app.get("/health", tags=["Santé"], summary="Vérifier l'état de l'API")

@@ -18,6 +18,16 @@ from api.models import User, UserAuth, BiometricMetric, WorkoutSession
 from api.biometrics import validate_user_biometrics
 from api.permissions import AI_PREMIUM_REQUIRED_DETAIL, can_use_ai
 from api.routers.auth import get_current_user
+from api.ai_request_service import (
+    attach_meal_photo,
+    build_advice_record,
+    build_meal_plan_record,
+    build_photo_record,
+    build_trend_record,
+    build_workout_record,
+    macros_to_dict,
+    persist_ai_request,
+)
 from api.coach_utils import (
     advice_cache, workout_cache, trend_cache, meal_cache,
     coach_limiter,
@@ -317,6 +327,9 @@ def get_ai_advice(
     cached = advice_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/advice user_id=%s", user.id)
+        persist_ai_request(db, **build_advice_record(
+            user.id, display_name, cached, from_cache=True
+        ))
         return CoachResponse(user_id=user.id, user_name=display_name, advice=cached)
 
     # — Construction du prompt (inchangée) —
@@ -361,6 +374,7 @@ def get_ai_advice(
         logger.error("Erreur OpenAI /advice : %s", exc, exc_info=True)
         advice_text = get_fallback_advice(user.goal)  # fallback au lieu de 502
 
+    persist_ai_request(db, **build_advice_record(user.id, display_name, advice_text))
     return CoachResponse(user_id=user.id, user_name=display_name, advice=advice_text)
 
 
@@ -475,12 +489,31 @@ def analyze_photo(
             detail=NOT_A_MEAL_DETAIL,
         )
 
+    foods = parsed.get("foods_detected", [])
+    macros_obj = Macros(**parsed["macros"])
+    advice_text = parsed.get("advice", "")
+    macros_dict = macros_to_dict(macros_obj)
+
+    row = persist_ai_request(
+        db,
+        **build_photo_record(
+            user.id,
+            display_name,
+            foods,
+            macros_dict,
+            advice_text,
+            mime_type,
+            len(image_bytes),
+        ),
+    )
+    attach_meal_photo(db, row, user.id, image_bytes, mime_type)
+
     return PhotoResponse(
         user_id=user.id,
         user_name=display_name,
-        foods_detected=parsed.get("foods_detected", []),
-        macros=Macros(**parsed["macros"]),
-        advice=parsed.get("advice", ""),
+        foods_detected=foods,
+        macros=macros_obj,
+        advice=advice_text,
     )
 
 
@@ -523,6 +556,18 @@ def get_workout_plan(
     cached = workout_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/workout-plan user_id=%s", user.id)
+        persist_ai_request(
+            db,
+            **build_workout_record(
+                user.id,
+                display_name,
+                payload.equipment,
+                payload.days_per_week,
+                cached,
+                equipment_label=EQUIPMENT_LABELS.get(payload.equipment),
+                from_cache=True,
+            ),
+        )
         return WorkoutResponse(user_id=user.id, user_name=display_name, plan=cached)
 
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
@@ -566,6 +611,17 @@ def get_workout_plan(
         logger.error("Erreur OpenAI /workout-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_WORKOUT
 
+    persist_ai_request(
+        db,
+        **build_workout_record(
+            user.id,
+            display_name,
+            payload.equipment,
+            payload.days_per_week,
+            plan_text,
+            equipment_label=EQUIPMENT_LABELS.get(payload.equipment),
+        ),
+    )
     return WorkoutResponse(user_id=user.id, user_name=display_name, plan=plan_text)
 
 
@@ -611,6 +667,17 @@ def get_meal_plan(
     cached = meal_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/meal-plan user_id=%s", user.id)
+        persist_ai_request(
+            db,
+            **build_meal_plan_record(
+                user.id,
+                display_name,
+                payload.budget_euros,
+                payload.allergies,
+                cached,
+                from_cache=True,
+            ),
+        )
         return MealPlanResponse(user_id=user.id, user_name=display_name, plan=cached)
 
     # — Contexte utilisateur —
@@ -645,6 +712,16 @@ def get_meal_plan(
         logger.error("Erreur OpenAI /meal-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_MEAL
 
+    persist_ai_request(
+        db,
+        **build_meal_plan_record(
+            user.id,
+            display_name,
+            payload.budget_euros,
+            payload.allergies,
+            plan_text,
+        ),
+    )
     return MealPlanResponse(user_id=user.id, user_name=display_name, plan=plan_text)
 
 
@@ -677,12 +754,6 @@ def get_biometric_trend(
             detail="Quota atteint : 10 appels IA par heure.",
         )
 
-    cache_key = TTLCache.make_key(endpoint="trend", user_id=user.id, v="tu_coach")
-    cached = trend_cache.get(cache_key)
-    if cached:
-        logger.info("Cache hit — /coach/biometric-trend user_id=%s", user.id)
-        return TrendResponse(user_id=user.id, user_name=display_name, analysis=cached)
-
     since = date.today() - timedelta(days=30)
     metrics = (
         db.query(BiometricMetric)
@@ -698,6 +769,22 @@ def get_biometric_trend(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Aucune donnée biométrique sur les 30 derniers jours.",
         )
+
+    cache_key = TTLCache.make_key(endpoint="trend", user_id=user.id, v="tu_coach")
+    cached = trend_cache.get(cache_key)
+    if cached:
+        logger.info("Cache hit — /coach/biometric-trend user_id=%s", user.id)
+        persist_ai_request(
+            db,
+            **build_trend_record(
+                user.id,
+                display_name,
+                cached,
+                metrics_count=len(metrics),
+                from_cache=True,
+            ),
+        )
+        return TrendResponse(user_id=user.id, user_name=display_name, analysis=cached)
 
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
     data_lines = []
@@ -735,4 +822,13 @@ def get_biometric_trend(
         logger.error("Erreur OpenAI /biometric-trend : %s", exc, exc_info=True)
         analysis_text = FALLBACK_TREND
 
+    persist_ai_request(
+        db,
+        **build_trend_record(
+            user.id,
+            display_name,
+            analysis_text,
+            metrics_count=len(metrics),
+        ),
+    )
     return TrendResponse(user_id=user.id, user_name=display_name, analysis=analysis_text)

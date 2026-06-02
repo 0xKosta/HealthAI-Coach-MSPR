@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Date, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from api.database import Base
@@ -64,6 +64,10 @@ class User(Base):
         back_populates="user",
         uselist=False,
         foreign_keys="UserAuth.user_id",
+    )
+    ai_requests: Mapped[list["AiRequest"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
 
@@ -246,6 +250,46 @@ class BiometricMetric(Base):
 
     # Relations
     user: Mapped[User] = relationship(back_populates="biometric_metrics")
+
+# =============================================================================
+# TABLE : ai_requests  (historique requêtes / réponses coach IA)
+# =============================================================================
+class AiRequest(Base):
+    __tablename__ = "ai_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    request_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="success")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    input_summary: Mapped[str | None] = mapped_column(Text)
+    output_summary: Mapped[str | None] = mapped_column(Text)
+    input_json: Mapped[dict | None] = mapped_column(JSON)
+    output_json: Mapped[dict | None] = mapped_column(JSON)
+    photo_path: Mapped[str | None] = mapped_column(String(500))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    from_cache: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    __table_args__ = (
+        CheckConstraint(
+            "request_type IN ("
+            "'advice', 'analyze_photo', 'workout_plan', "
+            "'biometric_trend', 'meal_plan'"
+            ")",
+            name="ck_ai_requests_type",
+        ),
+        CheckConstraint(
+            "status IN ('success', 'error')",
+            name="ck_ai_requests_status",
+        ),
+    )
+
+    user: Mapped["User"] = relationship(back_populates="ai_requests")
+
 
 # =============================================================================
 # TABLE : user_auth  (authentification réseau social)
