@@ -6,21 +6,8 @@
         <h1 class="text-3xl font-bold text-brand-primary">Tendances Biométriques</h1>
         <p class="text-slate-600 mt-1">Évolution de vos données de santé sur 30 jours</p>
       </div>
-      <div class="flex items-center gap-3">
-        <div v-if="currentUser" class="hidden sm:flex items-center gap-2 text-sm text-slate-600">
-          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white">
-            <svg v-if="currentUser.gender === 'female'" class="w-4 h-4 text-pink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-              <circle cx="12" cy="8" r="4" />
-              <path d="M12 12v9M9 18h6" />
-            </svg>
-            <svg v-else class="w-4 h-4 text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-              <circle cx="10" cy="14" r="5" />
-              <path d="M14 10l6-6M16 4h4v4" />
-            </svg>
-          </span>
-          <span class="font-medium text-brand-primary">{{ displayName }}</span>
-        </div>
-        <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+      <div v-if="isAdminScope" class="flex items-center gap-3">
+        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
     </div>
 
@@ -74,13 +61,30 @@
       </div>
 
       <!-- Analyse IA -->
-      <div class="card">
+      <div class="card" :class="{ 'opacity-90': !canAnalyzeTrends }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 class="text-xl font-bold text-brand-primary">Analyse des tendances</h2>
-            <p class="text-sm text-slate-600 mt-0.5">Interprétation IA de l'évolution sur 30 jours</p>
+          <div class="flex items-start gap-3">
+            <div
+              v-if="!canAnalyzeTrends"
+              class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"
+            >
+              <span class="material-symbols-outlined text-[22px] text-slate-500">lock</span>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-brand-primary">Analyse des tendances</h2>
+              <p class="text-sm text-slate-600 mt-0.5">
+                {{ canAnalyzeTrends
+                  ? "Interprétation IA de l'évolution sur 30 jours"
+                  : `Disponible après ${MIN_TREND_ANALYSIS_DAYS} jours de données synchronisées` }}
+              </p>
+            </div>
           </div>
-          <button @click="fetchTrendAnalysis" :disabled="trendLoading" class="btn-primary">
+          <button
+            v-if="canAnalyzeTrends"
+            @click="fetchTrendAnalysis"
+            :disabled="trendLoading"
+            class="btn-primary shrink-0"
+          >
             <div v-if="trendLoading" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
             <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
@@ -89,44 +93,92 @@
           </button>
         </div>
 
-        <ErrorAlert v-if="trendError" :message="trendError" />
-
-        <div v-if="!trendAnalysis && !trendLoading && !trendError"
-             class="flex flex-col items-center justify-center py-10 text-center">
-          <div class="w-16 h-16 rounded-2xl bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center mb-4">
-            <svg class="w-8 h-8 text-brand-accent/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
+        <div v-if="!canAnalyzeTrends" class="mb-6">
+          <div class="flex justify-between text-sm mb-2">
+            <span class="font-medium text-brand-primary">Jours de données collectés</span>
+            <span class="text-slate-600">{{ distinctMetricDays }}/{{ MIN_TREND_ANALYSIS_DAYS }}</span>
           </div>
-          <p class="text-slate-600 text-sm">Cliquez pour obtenir une analyse détaillée de vos tendances</p>
+          <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              class="h-full rounded-full bg-gradient-to-r from-brand-accent to-teal-500 transition-all duration-500"
+              :style="{ width: `${trendAnalysisProgress}%` }"
+            ></div>
+          </div>
+          <p class="text-xs text-slate-600 mt-2">
+            {{ trendDaysRemaining > 0
+              ? `Encore ${trendDaysRemaining} jour${trendDaysRemaining > 1 ? 's' : ''} pour débloquer l'analyse IA.`
+              : 'Presque prêt — continuez la synchronisation.' }}
+          </p>
         </div>
 
-        <AIAdviceCard v-if="trendAnalysis" title="Analyse des tendances" :content="trendAnalysis" />
+        <template v-if="canAnalyzeTrends">
+          <ErrorAlert v-if="trendError" :message="trendError" />
+
+          <div v-if="!trendAnalysis && !trendLoading && !trendError"
+               class="flex flex-col items-center justify-center py-10 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center mb-4">
+              <svg class="w-8 h-8 text-brand-accent/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+            <p class="text-slate-600 text-sm">Cliquez pour obtenir une analyse détaillée de vos tendances</p>
+          </div>
+
+          <AIAdviceCard v-if="trendAnalysis" title="Analyse des tendances" :content="trendAnalysis" />
+        </template>
+
+        <div
+          v-else
+          class="flex flex-col items-center justify-center py-8 text-center rounded-xl bg-slate-50 border border-slate-100"
+        >
+          <p class="text-sm text-slate-600 max-w-md">
+            Portez votre montre ou bracelet connecté quelques jours de plus : l'IA pourra alors
+            interpréter vos tendances de poids, sommeil et fréquence cardiaque de façon fiable.
+          </p>
+        </div>
       </div>
     </template>
 
     <!-- État vide -->
     <div v-if="!metricsLoading && !metricsError && !userMetrics.length"
-         class="flex flex-col items-center justify-center py-16 text-center">
-      <div class="w-20 h-20 rounded-2xl bg-brand-neutral border border-slate-200 flex items-center justify-center mb-5">
-        <svg class="w-10 h-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-        </svg>
+         class="card flex flex-col items-center justify-center py-14 px-6 text-center max-w-xl mx-auto">
+      <div class="w-20 h-20 rounded-2xl bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center mb-5">
+        <span class="material-symbols-outlined text-[40px] text-brand-accent/70">watch</span>
       </div>
-      <p class="text-brand-secondary font-medium">Aucune donnée biométrique disponible</p>
-      <p class="text-slate-600 text-sm mt-1">Sélectionnez un autre utilisateur ou importez des métriques</p>
+      <p class="text-lg font-bold text-brand-primary">Aucune donnée biométrique disponible</p>
+      <p class="text-slate-600 text-sm mt-2 max-w-md">
+        Connectez votre montre, bracelet ou application santé pour synchroniser poids,
+        sommeil et fréquence cardiaque. Vos graphiques apparaîtront dès les premières
+        mesures reçues.
+      </p>
+      <div class="mt-5 flex items-start gap-2.5 p-3.5 rounded-xl bg-brand-warning/10 border border-brand-warning/30 text-left max-w-md">
+        <span class="material-symbols-outlined text-[20px] leading-none text-brand-warning shrink-0 mt-0.5">info</span>
+        <p class="text-xs text-amber-900 leading-relaxed">
+          <span class="font-semibold">À noter :</span>
+          pour bénéficier de l'analyse IA de HealthAI Coach sur vos tendances, un minimum de
+          <span class="font-semibold">{{ MIN_TREND_ANALYSIS_DAYS }} jours</span>
+          de données synchronisées est nécessaire.
+        </p>
+      </div>
+      <p v-if="isAdminScope" class="text-slate-500 text-xs mt-3">
+        Vous pouvez aussi sélectionner un autre utilisateur dans la liste admin.
+      </p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import { useAuthStore } from '@/stores/authStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
-import { metricsAPI, coachAPI, usersAPI } from '@/services/api'
+import {
+  MIN_TREND_ANALYSIS_DAYS,
+  countDistinctMetricDays,
+  canUnlockTrendAnalysis,
+} from '@/composables/useBiometricTrends'
+import { metricsAPI, coachAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
@@ -134,7 +186,6 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
-const auth = useAuthStore()
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -146,24 +197,22 @@ const trendLoading = ref(false)
 const trendError = ref('')
 const activeUserId = ref(null)
 const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
-const activeUser = ref(null)
-
-const currentUser = computed(() => activeUser.value)
-
-// Prénom du compte connecté côté utilisateur, nom du profil côté admin
-const displayName = computed(() => {
-  if (!isAdminScope.value && auth.currentUser?.first_name) {
-    return auth.currentUser.first_name
-  }
-  return activeUser.value?.name
-})
-
 const userMetrics = computed(() =>
   allMetrics.value
     .slice()
     .sort((a, b) => new Date(a.record_date) - new Date(b.record_date))
     .slice(-30)
 )
+
+const distinctMetricDays = computed(() => countDistinctMetricDays(userMetrics.value))
+const canAnalyzeTrends = computed(() => canUnlockTrendAnalysis(userMetrics.value))
+const trendDaysRemaining = computed(() =>
+  Math.max(0, MIN_TREND_ANALYSIS_DAYS - distinctMetricDays.value)
+)
+const trendAnalysisProgress = computed(() =>
+  Math.min(100, Math.round((distinctMetricDays.value / MIN_TREND_ANALYSIS_DAYS) * 100))
+)
+
 const latestMetric  = computed(() => userMetrics.value.at(-1))
 const oldestMetric  = computed(() => userMetrics.value.at(0))
 
@@ -240,7 +289,7 @@ async function loadMetrics() {
 }
 
 async function fetchTrendAnalysis() {
-  if (!activeUserId.value) return
+  if (!activeUserId.value || !canAnalyzeTrends.value) return
   trendLoading.value = true; trendError.value = ''; trendAnalysis.value = ''
   try {
     const res = await coachAPI.getBiometricTrend(activeUserId.value)
@@ -266,15 +315,9 @@ function goToUsersList() {
   router.push(isAdminScope.value ? '/admin' : '/')
 }
 
-async function loadUserProfile() {
-  if (!activeUserId.value) return
-  try {
-    const res = await usersAPI.getById(activeUserId.value)
-    activeUser.value = res.data
-  } catch {
-    activeUser.value = null
-  }
-}
+watch(canAnalyzeTrends, (ok) => {
+  if (!ok) resetTrendState()
+})
 
 watch(
   () => route.params.userId,
@@ -285,15 +328,9 @@ watch(
       return
     }
     userStore.selectUser(activeUserId.value)
-    loadUserProfile()
     resetTrendState()
     loadMetrics()
   },
   { immediate: true }
 )
-
-onMounted(async () => {
-  if (!activeUserId.value) return
-  await loadUserProfile()
-})
 </script>

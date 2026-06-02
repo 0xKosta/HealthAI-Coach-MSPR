@@ -5,7 +5,11 @@
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Programme d'Entraînement</h1>
-        <p class="text-slate-600 mt-1">Générez un plan IA personnalisé selon votre profil et vos objectifs</p>
+        <p class="text-slate-600 mt-1">
+          {{ profileIncomplete
+            ? 'Complétez votre profil pour générer un programme personnalisé'
+            : 'Générez un plan IA personnalisé selon votre profil et vos objectifs' }}
+        </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
@@ -17,8 +21,16 @@
     <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
     <ErrorAlert v-else-if="userError" :message="userError" />
 
+    <ProfileAiGate
+      v-if="currentUser && profileIncomplete"
+      title="Génération de programme verrouillée"
+      :description="PROFILE_AI_REQUIRED_MSG"
+      :profile-edit-path="profileEditPath"
+      :cta-label="isAdminScope ? 'Modifier le profil' : 'Compléter mon profil'"
+    />
+
     <!-- Formulaire de configuration -->
-    <div v-if="currentUser" class="card">
+    <div v-else-if="currentUser" class="card">
       <h2 class="text-xl font-bold text-brand-primary mb-6">Paramètres du programme</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>
@@ -70,7 +82,7 @@
     <ErrorAlert v-if="planError" :message="planError" />
 
     <!-- Résultat programme IA -->
-    <div v-if="plan" class="card animate-slide-up">
+    <div v-if="plan && !profileIncomplete" class="card animate-slide-up">
       <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="text-xl font-bold text-brand-primary">Votre programme</h2>
@@ -96,11 +108,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
+import { isProfileIncomplete, getProfileEditPath, PROFILE_AI_REQUIRED_MSG } from '@/composables/useProfileCompletion'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
+import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 
 const userStore = useUserStore()
 const { isAdminScope } = useDashboardScope()
@@ -116,6 +130,9 @@ const form = ref({ equipment: 'dumbbell', daysPerWeek: 3 })
 const generating = ref(false)
 const planError = ref('')
 const plan = ref(null)
+
+const profileIncomplete = computed(() => isProfileIncomplete(currentUser.value))
+const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
 
 const equipmentOptions = [
   { value: 'none',       label: 'Aucun',         icon: 'self_improvement' },
@@ -140,7 +157,7 @@ const daysLabel = computed(() => {
 })
 
 async function generatePlan() {
-  if (!activeUserId.value) return
+  if (!activeUserId.value || profileIncomplete.value) return
   generating.value = true; planError.value = ''; plan.value = null
   try {
     const res = await coachAPI.getWorkoutPlan(activeUserId.value, form.value.equipment, form.value.daysPerWeek)
@@ -165,6 +182,9 @@ async function loadUserProfile() {
     const res = await usersAPI.getById(activeUserId.value)
     currentUser.value = res.data
     userStore.selectUser(activeUserId.value)
+    if (isProfileIncomplete(currentUser.value)) {
+      plan.value = null
+    }
   } catch {
     userError.value = "Impossible de charger ce profil utilisateur."
     currentUser.value = null
@@ -185,4 +205,11 @@ watch(() => route.params.userId, async () => {
   }
   await loadUserProfile()
 }, { immediate: true })
+
+watch(() => route.fullPath, async (path, prev) => {
+  if (!activeUserId.value || !prev) return
+  if (prev.includes('/profile') && !path.includes('/profile')) {
+    await loadUserProfile()
+  }
+})
 </script>

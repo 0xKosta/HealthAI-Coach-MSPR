@@ -4,7 +4,11 @@
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Analyse Nutritionnelle</h1>
-        <p class="text-slate-600 mt-1">Analysez un repas par photo grâce à l'IA vision</p>
+        <p class="text-slate-600 mt-1">
+          {{ profileIncomplete
+            ? 'Complétez votre profil pour activer l\'analyse photo IA'
+            : "Analysez un repas par photo grâce à l'IA vision" }}
+        </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
@@ -16,8 +20,16 @@
     <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
     <ErrorAlert v-else-if="userError" :message="userError" />
 
+    <ProfileAiGate
+      v-if="currentUser && profileIncomplete"
+      title="Analyse nutritionnelle verrouillée"
+      :description="PROFILE_AI_REQUIRED_MSG"
+      :profile-edit-path="profileEditPath"
+      :cta-label="isAdminScope ? 'Modifier le profil' : 'Compléter mon profil'"
+    />
+
     <!-- Zone upload -->
-    <div v-if="currentUser" class="card">
+    <div v-else-if="currentUser" class="card">
       <h2 class="text-xl font-bold text-brand-primary mb-5">Photo du repas</h2>
 
       <div
@@ -74,7 +86,7 @@
 
     <ErrorAlert v-if="error" :message="error" />
 
-    <template v-if="result">
+    <template v-if="result && !profileIncomplete">
       <!-- Aliments détectés -->
       <div class="card animate-slide-up">
         <h2 class="text-xl font-bold text-brand-primary mb-4">Aliments détectés</h2>
@@ -105,16 +117,18 @@
 </template>
 
 <script setup>
-import { ref, defineComponent, h, watch } from 'vue'
+import { ref, computed, defineComponent, h, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
+import { isProfileIncomplete, getProfileEditPath, PROFILE_AI_REQUIRED_MSG } from '@/composables/useProfileCompletion'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
+import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 
 const userStore = useUserStore()
 const { isAdminScope } = useDashboardScope()
@@ -132,6 +146,9 @@ const dragOver = ref(false)
 const analyzing = ref(false)
 const error = ref('')
 const result = ref(null)
+
+const profileIncomplete = computed(() => isProfileIncomplete(currentUser.value))
+const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -198,6 +215,9 @@ async function loadUserProfile() {
     const res = await usersAPI.getById(activeUserId.value)
     currentUser.value = res.data
     userStore.selectUser(activeUserId.value)
+    if (isProfileIncomplete(currentUser.value)) {
+      clearImage()
+    }
   } catch {
     userError.value = "Impossible de charger ce profil utilisateur."
     currentUser.value = null
@@ -211,7 +231,7 @@ function goToUsersList() {
 }
 
 async function analyzePhoto() {
-  if (!imageBase64.value || !activeUserId.value) return
+  if (!imageBase64.value || !activeUserId.value || profileIncomplete.value) return
   analyzing.value = true; error.value = ''; result.value = null
   try {
     const res = await coachAPI.analyzePhoto(activeUserId.value, imageBase64.value)
@@ -241,4 +261,11 @@ watch(() => route.params.userId, async () => {
   }
   await loadUserProfile()
 }, { immediate: true })
+
+watch(() => route.fullPath, async (path, prev) => {
+  if (!activeUserId.value || !prev) return
+  if (prev.includes('/profile') && !path.includes('/profile')) {
+    await loadUserProfile()
+  }
+})
 </script>
