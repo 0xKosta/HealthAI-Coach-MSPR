@@ -83,6 +83,46 @@
         </button>
       </div>
     </form>
+
+    <!-- Zone de danger : suppression définitive du compte -->
+    <div v-if="!loading" class="card border-brand-error/30 bg-brand-error/5">
+      <h2 class="text-lg font-bold text-brand-error">Supprimer mon compte</h2>
+      <p class="text-sm text-slate-600 mt-1">
+        Cette action est définitive. Toutes vos données seront supprimées et ne pourront pas être récupérées.
+      </p>
+      <button type="button" class="btn-danger mt-4" @click="confirmOpen = true">
+        <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+        Supprimer mon compte
+      </button>
+    </div>
+
+    <!-- Modale de confirmation -->
+    <div
+      v-if="confirmOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      @click.self="closeConfirm"
+    >
+      <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-fade-in">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-brand-error/10 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-brand-error">warning</span>
+          </div>
+          <h3 class="text-lg font-bold text-brand-primary">Êtes-vous sûr de supprimer votre compte ?</h3>
+        </div>
+        <p class="text-sm text-slate-600">
+          La suppression est <strong>définitive</strong>. Toutes vos données (profil, mesures,
+          séances, historique) seront <strong>perdues</strong> et ne pourront pas être récupérées.
+        </p>
+        <ErrorAlert v-if="deleteError" :message="deleteError" />
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" class="btn-secondary" :disabled="deleting" @click="closeConfirm">Annuler</button>
+          <button type="button" class="btn-danger" :disabled="deleting" @click="onDelete">
+            <div v-if="deleting" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            {{ deleting ? 'Suppression...' : 'Supprimer définitivement' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -101,6 +141,10 @@ const loading = ref(true)
 const loadError = ref('')
 const saving = ref(false)
 const formError = ref('')
+
+const confirmOpen = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
 
 const form = reactive({
   age: null,
@@ -204,6 +248,26 @@ async function onSubmit() {
       e.response?.data?.detail || "Erreur lors de l'enregistrement du profil."
   } finally {
     saving.value = false
+  }
+}
+
+function closeConfirm() {
+  if (deleting.value) return
+  confirmOpen.value = false
+  deleteError.value = ''
+}
+
+async function onDelete() {
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    await authAPI.deleteAccount()
+    auth.logout()
+    router.push('/login')
+  } catch (e) {
+    deleteError.value =
+      e.response?.data?.detail || 'Erreur lors de la suppression du compte.'
+    deleting.value = false
   }
 }
 

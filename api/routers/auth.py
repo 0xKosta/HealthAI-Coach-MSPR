@@ -389,3 +389,40 @@ def update_my_profile(
     db.commit()
     db.refresh(profile)
     return profile
+
+
+# =============================================================================
+# SUPPRESSION DE COMPTE (RGPD — droit à l'effacement, art. 17)
+# =============================================================================
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Supprimer définitivement son compte (RGPD)",
+)
+def delete_my_account(
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    """Suppression totale et définitive du compte de l'utilisateur connecté.
+
+    Conforme au droit à l'effacement (art. 17 RGPD). Supprimer la ligne `users`
+    liée déclenche, via les contraintes ON DELETE CASCADE, l'effacement de
+    toutes les données associées : compte d'authentification (user_auth),
+    profil santé, métriques biométriques, séances d'entraînement (et exercices
+    de séance), journaux alimentaires et publications.
+    Si aucun profil santé n'est lié, seul le compte user_auth est supprimé.
+    """
+    try:
+        if current_user.user_id:
+            profile = db.query(User).filter(User.id == current_user.user_id).first()
+            # La suppression du profil parent cascade jusqu'à user_auth.
+            db.delete(profile if profile else current_user)
+        else:
+            db.delete(current_user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return None

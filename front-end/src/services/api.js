@@ -45,7 +45,9 @@ export const authAPI = {
   updateMe: (data) => api.put('/auth/me', data),
   // Profil santé (table users) lié au compte connecté
   getProfile: () => api.get('/auth/me/profile'),
-  updateProfile: (data) => api.put('/auth/me/profile', data)
+  updateProfile: (data) => api.put('/auth/me/profile', data),
+  // Suppression définitive du compte (RGPD — droit à l'effacement)
+  deleteAccount: () => api.delete('/auth/me')
 }
 
 export const usersAPI = {
