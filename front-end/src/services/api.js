@@ -87,6 +87,12 @@ export const coachAPI = {
     api.post('/coach/analyze-photo', { user_id: userId, image_base64: imageBase64 }),
   getWorkoutPlan: (userId, equipment, daysPerWeek) =>
     api.post('/coach/workout-plan', { user_id: userId, equipment, days_per_week: daysPerWeek }),
+  getMealPlan: (userId, budgetEuros, allergies = []) =>
+    api.post('/coach/meal-plan', {
+      user_id: userId,
+      budget_euros: budgetEuros,
+      allergies,
+    }),
   getBiometricTrend: (userId) =>
     api.post('/coach/biometric-trend', { user_id: userId })
 }
