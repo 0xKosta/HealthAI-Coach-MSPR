@@ -105,6 +105,24 @@ class UserResponse(BaseModel):
 
     id: int
     name: str = Field(..., max_length=100)
+    first_name: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Prénom du compte user_auth lié, si présent",
+    )
+    last_name: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Nom du compte user_auth lié, si présent",
+    )
+    plan: Optional[Literal["free", "premium", "premium_plus"]] = Field(
+        None,
+        description="Offre du compte user_auth lié, si présent",
+    )
+    role: Optional[Literal["user", "admin", "demo"]] = Field(
+        None,
+        description="Rôle du compte user_auth lié, si présent",
+    )
     age: Optional[int] = None
     gender: Optional[Literal["male", "female", "other"]] = None
     weight_kg: Optional[float] = None

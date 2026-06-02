@@ -2,15 +2,34 @@
 # CRUD complet pour la ressource User
 # Préfixe monté dans main.py : /users
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from api.biometrics import resolve_bmi, validate_user_biometrics
 from api.database import get_db
-from api.models import User
+from api.models import User, UserAuth
 from api.schemas import UserCreate, UserResponse
 
 router = APIRouter()
+
+
+def _to_user_response(user: User, auth: UserAuth | None = None) -> UserResponse:
+    response = UserResponse.model_validate(user)
+    if auth is None:
+        auth = user.auth_account
+    if not auth:
+        return response
+    return response.model_copy(
+        update={
+            "first_name": auth.first_name,
+            "last_name": auth.last_name,
+            "plan": auth.plan,
+            "role": auth.role,
+        }
+    )
 
 
 @router.get(
@@ -23,19 +42,40 @@ def list_users(
     skip: int = Query(0, ge=0, description="Nombre d'entrées à ignorer"),
     limit: int = Query(100, ge=1, le=1000, description="Nombre maximum d'entrées à retourner"),
     q: str | None = Query(None, description="Filtre de recherche sur le nom/prénom"),
+    plan: Literal["free", "premium", "premium_plus"] | None = Query(
+        None, description="Filtre sur l'offre user_auth"
+    ),
+    sort: Literal["id_asc", "created_desc", "created_asc"] = Query(
+        "id_asc", description="Tri par identifiant ou date de création du profil"
+    ),
     response: Response = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(User)
+    query = db.query(User, UserAuth).outerjoin(UserAuth, UserAuth.user_id == User.id)
     if q:
         search = q.strip()
         if search:
             like = f"%{search}%"
-            query = query.filter(User.name.ilike(like))
+            query = query.filter(
+                or_(
+                    User.name.ilike(like),
+                    UserAuth.first_name.ilike(like),
+                    UserAuth.last_name.ilike(like),
+                )
+            )
+    if plan:
+        query = query.filter(UserAuth.plan == plan)
     total_count = query.count()
     if response is not None:
         response.headers["X-Total-Count"] = str(total_count)
-    return query.order_by(User.id).offset(skip).limit(limit).all()
+    if sort == "created_desc":
+        query = query.order_by(User.created_at.desc(), User.id.desc())
+    elif sort == "created_asc":
+        query = query.order_by(User.created_at.asc(), User.id.asc())
+    else:
+        query = query.order_by(User.id)
+    rows = query.offset(skip).limit(limit).all()
+    return [_to_user_response(user, auth) for user, auth in rows]
 
 
 @router.get(
@@ -45,10 +85,16 @@ def list_users(
     description="Retourne le profil d'un utilisateur par son identifiant.",
 )
 def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
+    row = (
+        db.query(User, UserAuth)
+        .outerjoin(UserAuth, UserAuth.user_id == User.id)
+        .filter(User.id == user_id)
+        .first()
+    )
+    if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
-    return user
+    user, auth = row
+    return _to_user_response(user, auth)
 
 
 def _apply_user_payload(user: User, payload: UserCreate) -> None:
@@ -79,7 +125,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return _to_user_response(user)
 
 
 @router.put(
@@ -95,7 +141,7 @@ def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)
     _apply_user_payload(user, payload)
     db.commit()
     db.refresh(user)
-    return user
+    return _to_user_response(user)
 
 
 @router.delete(

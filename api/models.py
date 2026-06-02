@@ -59,6 +59,12 @@ class User(Base):
     food_logs: Mapped[list[FoodLog]] = relationship(back_populates="user", cascade="all, delete-orphan")
     workout_sessions: Mapped[list[WorkoutSession]] = relationship(back_populates="user", cascade="all, delete-orphan")
     biometric_metrics: Mapped[list[BiometricMetric]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    auth_account: Mapped["UserAuth | None"] = relationship(
+        "UserAuth",
+        back_populates="user",
+        uselist=False,
+        foreign_keys="UserAuth.user_id",
+    )
 
 
 # =============================================================================
@@ -274,7 +280,9 @@ class UserAuth(Base):
         back_populates="author", cascade="all, delete-orphan"
     )
     
-    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
+    user: Mapped["User | None"] = relationship(
+        "User", back_populates="auth_account", foreign_keys=[user_id]
+    )
 
 
 # =============================================================================

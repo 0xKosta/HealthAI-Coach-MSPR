@@ -16,6 +16,7 @@ import { computed } from 'vue'
 const props = defineProps({
   plan: { type: String, default: 'free' },
   role: { type: String, default: 'user' },
+  size: { type: String, default: 'sm' }, // sm | md
 })
 
 const PLAN_LABELS = {
@@ -40,6 +41,7 @@ const isGold = computed(() =>
 const badgeClass = computed(() => ({
   'plan-badge-light--gold': isGold.value,
   'plan-badge-light--free': !isGold.value,
+  'plan-badge-light--md': props.size === 'md',
 }))
 
 const showStar = computed(() =>
@@ -58,6 +60,10 @@ const title = computed(() => {
 <style scoped>
 .plan-badge-light {
   @apply inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide leading-none;
+}
+
+.plan-badge-light--md {
+  @apply px-3 py-1 text-xs tracking-wider;
 }
 
 .plan-badge-light--free {
