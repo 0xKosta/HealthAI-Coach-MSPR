@@ -4,6 +4,7 @@
 import logging
 import os
 from datetime import datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -114,6 +115,18 @@ class AdminCreateAccountRequest(BaseModel):
     password: str = Field(..., min_length=6)
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
+    plan: Literal["free", "premium", "premium_plus"] = "free"
+    role: Literal["user", "admin", "demo"] = "user"
+
+
+class AdminUpdateAccountRequest(BaseModel):
+    """Mise à jour du compte user_auth lié à un profil santé (users.id)."""
+
+    email: EmailStr | None = None
+    first_name: str | None = Field(None, min_length=1, max_length=50)
+    last_name: str | None = Field(None, min_length=1, max_length=50)
+    plan: Literal["free", "premium", "premium_plus"] | None = None
+    role: Literal["user", "admin", "demo"] | None = None
 
 
 class AdminCreateAccountResponse(BaseModel):
@@ -245,7 +258,83 @@ def admin_create_user(
         password=payload.password,
         first_name=payload.first_name,
         last_name=payload.last_name,
+        role=payload.role,
+        plan=payload.plan,
     )
+    return AdminCreateAccountResponse(
+        id=account.id,
+        email=account.email,
+        first_name=account.first_name,
+        last_name=account.last_name,
+        user_id=account.user_id,
+        role=account.role,
+        plan=account.plan,
+    )
+
+
+@router.put(
+    "/admin/users/{profile_user_id}",
+    response_model=AdminCreateAccountResponse,
+    summary="Modifier le compte lié à un profil (admin)",
+    description=(
+        "Met à jour user_auth (email, prénom, nom, plan, rôle) pour le profil "
+        "santé identifié par profile_user_id (users.id)."
+    ),
+)
+def admin_update_user_account(
+    profile_user_id: int,
+    payload: AdminUpdateAccountRequest,
+    db: Session = Depends(get_db),
+    current_admin: UserAuth = Depends(require_admin),
+):
+    account = (
+        db.query(UserAuth).filter(UserAuth.user_id == profile_user_id).first()
+    )
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucun compte de connexion n'est lié à ce profil.",
+        )
+
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aucun champ à mettre à jour.",
+        )
+
+    if "email" in data and data["email"] != account.email:
+        existing = (
+            db.query(UserAuth)
+            .filter(UserAuth.email == data["email"], UserAuth.id != account.id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Un compte existe déjà avec cet email.",
+            )
+        account.email = data["email"]
+
+    if "first_name" in data:
+        account.first_name = data["first_name"]
+    if "last_name" in data:
+        account.last_name = data["last_name"]
+    if "plan" in data:
+        account.plan = data["plan"]
+    if "role" in data:
+        if (
+            account.id == current_admin.id
+            and data["role"] != "admin"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Vous ne pouvez pas retirer votre propre rôle administrateur.",
+            )
+        account.role = data["role"]
+
+    db.commit()
+    db.refresh(account)
     return AdminCreateAccountResponse(
         id=account.id,
         email=account.email,

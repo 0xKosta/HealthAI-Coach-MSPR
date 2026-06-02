@@ -3,11 +3,11 @@
     <div class="flex items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">
-          {{ isAdminEdit ? 'Modifier le profil' : 'Mon profil santé' }}
+          {{ isAdminEdit ? 'Modifier l\'utilisateur' : 'Mon profil santé' }}
         </h1>
         <p class="text-slate-600 mt-1">
           <template v-if="isAdminEdit">
-            {{ adminDisplayName || 'Utilisateur' }} — l'IMC est calculé automatiquement
+            Compte (email, plan, rôle) et profil santé — IMC calculé automatiquement
           </template>
           <template v-else>
             Complétez vos informations - l'IMC est calculé automatiquement
@@ -20,7 +20,79 @@
     <LoadingSpinner v-if="loading" message="Chargement du profil..." />
     <ErrorAlert v-else-if="loadError" :message="loadError" />
 
-    <form v-else class="card space-y-6" @submit.prevent="onSubmit">
+    <form v-else class="space-y-6" @submit.prevent="onSubmit">
+      <div v-if="isAdminEdit && hasLinkedAccount" class="card space-y-5">
+        <div>
+          <h2 class="text-lg font-bold text-brand-primary">Compte de connexion</h2>
+          <p class="text-sm text-slate-500 mt-0.5">Email, identité affichée, offre et droits d'accès</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div class="sm:col-span-2">
+            <label class="label" for="account-email">Email</label>
+            <input
+              id="account-email"
+              v-model.trim="accountForm.email"
+              type="email"
+              required
+              autocomplete="off"
+              class="input"
+              placeholder="utilisateur@exemple.com"
+            />
+          </div>
+          <div>
+            <label class="label" for="account-first">Prénom</label>
+            <input
+              id="account-first"
+              v-model.trim="accountForm.first_name"
+              type="text"
+              required
+              maxlength="50"
+              class="input"
+            />
+          </div>
+          <div>
+            <label class="label" for="account-last">Nom</label>
+            <input
+              id="account-last"
+              v-model.trim="accountForm.last_name"
+              type="text"
+              required
+              maxlength="50"
+              class="input"
+            />
+          </div>
+          <div>
+            <label class="label" for="account-plan">Offre</label>
+            <select id="account-plan" v-model="accountForm.plan" class="select">
+              <option value="free">Gratuit</option>
+              <option value="premium">Premium</option>
+              <option value="premium_plus">Premium+</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="account-role">Rôle</label>
+            <select id="account-role" v-model="accountForm.role" class="select">
+              <option value="user">Utilisateur</option>
+              <option value="admin">Administrateur</option>
+              <option value="demo">Démo</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <p
+        v-else-if="isAdminEdit && !hasLinkedAccount"
+        class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3"
+      >
+        Ce profil n'a pas de compte de connexion (email / plan / rôle indisponibles). Seul le profil santé est modifiable.
+      </p>
+
+      <div class="card space-y-6">
+        <div v-if="isAdminEdit">
+          <h2 class="text-lg font-bold text-brand-primary">Profil santé</h2>
+          <p class="text-sm text-slate-500 mt-0.5">{{ adminDisplayName || 'Utilisateur' }}</p>
+        </div>
+
       <ProfileDataWarning
         v-if="loadedProfileIssues.length"
         :issues="loadedProfileIssues"
@@ -130,10 +202,11 @@
 
       <div class="flex justify-end gap-3 pt-2">
         <RouterLink :to="dashboardLink" class="btn-secondary">Annuler</RouterLink>
-        <button type="submit" :disabled="saving || !isFormValid" class="btn-primary">
+        <button type="submit" :disabled="saving || !isFormValid || !isAccountFormValid" class="btn-primary">
           <div v-if="saving" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
           {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
         </button>
+      </div>
       </div>
     </form>
 
@@ -253,6 +326,23 @@ const form = reactive({
   goal: null,
 })
 
+const accountForm = reactive({
+  email: '',
+  first_name: '',
+  last_name: '',
+  plan: 'free',
+  role: 'user',
+})
+
+const isAccountFormValid = computed(() => {
+  if (!isAdminEdit.value || !hasLinkedAccount.value) return true
+  return Boolean(
+    accountForm.email.trim() &&
+      accountForm.first_name.trim() &&
+      accountForm.last_name.trim()
+  )
+})
+
 const dashboardLink = computed(() => {
   if (isAdminEdit.value && targetUserId.value) {
     return `/admin/dashboard/${targetUserId.value}`
@@ -338,7 +428,14 @@ async function loadProfile() {
       const p = res.data
       profileName.value = p.name
       adminDisplayName.value = formatProfileDisplayName(p)
-      hasLinkedAccount.value = Boolean(p.first_name || p.last_name)
+      hasLinkedAccount.value = Boolean(p.email)
+      if (hasLinkedAccount.value) {
+        accountForm.email = p.email || ''
+        accountForm.first_name = p.first_name || ''
+        accountForm.last_name = p.last_name || ''
+        accountForm.plan = p.plan || 'free'
+        accountForm.role = p.role || 'user'
+      }
       applyProfileToForm(p)
     } else {
       const res = await authAPI.getProfile()
@@ -374,6 +471,15 @@ async function onSubmit() {
   try {
     loadedProfileIssues.value = []
     if (isAdminEdit.value) {
+      if (hasLinkedAccount.value) {
+        await authAPI.adminUpdateAccount(targetUserId.value, {
+          email: accountForm.email.trim(),
+          first_name: accountForm.first_name.trim(),
+          last_name: accountForm.last_name.trim(),
+          plan: accountForm.plan,
+          role: accountForm.role,
+        })
+      }
       await usersAPI.update(targetUserId.value, buildPayload())
     } else {
       await authAPI.updateProfile({

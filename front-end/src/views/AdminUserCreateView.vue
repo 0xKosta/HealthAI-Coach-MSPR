@@ -75,6 +75,22 @@
             placeholder="••••••••"
           />
         </div>
+        <div>
+          <label class="label" for="plan">Offre</label>
+          <select id="plan" v-model="form.plan" class="select">
+            <option value="free">Gratuit</option>
+            <option value="premium">Premium</option>
+            <option value="premium_plus">Premium+</option>
+          </select>
+        </div>
+        <div>
+          <label class="label" for="role">Rôle</label>
+          <select id="role" v-model="form.role" class="select">
+            <option value="user">Utilisateur</option>
+            <option value="admin">Administrateur</option>
+            <option value="demo">Démo</option>
+          </select>
+        </div>
       </div>
 
       <p class="text-sm text-slate-500 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
@@ -109,6 +125,8 @@ const form = reactive({
   last_name: '',
   email: '',
   password: '',
+  plan: 'free',
+  role: 'user',
 })
 const confirmPassword = ref('')
 const saving = ref(false)
@@ -138,6 +156,8 @@ async function onSubmit() {
       last_name: form.last_name,
       email: form.email,
       password: form.password,
+      plan: form.plan,
+      role: form.role,
     })
     const profileId = res.data.user_id
     userStore.selectUser(profileId)

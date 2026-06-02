@@ -115,6 +115,11 @@ class UserResponse(BaseModel):
         max_length=50,
         description="Nom du compte user_auth lié, si présent",
     )
+    email: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Email du compte user_auth lié, si présent",
+    )
     plan: Optional[Literal["free", "premium", "premium_plus"]] = Field(
         None,
         description="Offre du compte user_auth lié, si présent",

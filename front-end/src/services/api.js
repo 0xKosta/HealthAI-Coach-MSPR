@@ -51,6 +51,8 @@ export const authAPI = {
   // Suppression définitive du compte (RGPD — droit à l'effacement)
   deleteAccount: () => api.delete('/auth/me'),
   adminCreateUser: (data) => api.post('/auth/admin/users', data),
+  adminUpdateAccount: (profileUserId, data) =>
+    api.put(`/auth/admin/users/${profileUserId}`, data),
 }
 
 export const usersAPI = {

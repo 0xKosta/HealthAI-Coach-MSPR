@@ -43,6 +43,7 @@ def _to_user_response(user: User, auth: UserAuth | None = None) -> UserResponse:
         update={
             "first_name": auth.first_name,
             "last_name": auth.last_name,
+            "email": auth.email,
             "plan": auth.plan,
             "role": auth.role,
         }

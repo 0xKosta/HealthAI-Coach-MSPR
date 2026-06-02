@@ -132,6 +132,9 @@
             <p class="user-card__name">
               {{ formatProfileDisplayName(user) }}
             </p>
+            <p v-if="user.email" class="text-xs text-slate-500 truncate -mt-1 mb-1">
+              {{ user.email }}
+            </p>
 
             <div class="user-card__chips">
               <span class="user-chip user-chip--muted">
@@ -167,7 +170,7 @@
           <span>Objectif</span>
           <span>Plan</span>
           <span>Créé le</span>
-          <span class="text-center">Modifier</span>
+          <span class="text-center">Éditer</span>
           <span aria-hidden="true"></span>
         </div>
 
@@ -211,9 +214,14 @@
                 <path d="M14 10l6-6M16 4h4v4" />
               </svg>
             </div>
-            <p class="font-medium text-brand-primary truncate">
-              {{ formatProfileDisplayName(user) }}
-            </p>
+            <div class="min-w-0">
+              <p class="font-medium text-brand-primary truncate">
+                {{ formatProfileDisplayName(user) }}
+              </p>
+              <p v-if="user.email" class="text-xs text-slate-500 truncate">
+                {{ user.email }}
+              </p>
+            </div>
             <p class="text-sm text-slate-500 truncate">
               {{ user.gender ? genderLabel(user.gender) : '—' }}
             </p>
@@ -234,8 +242,8 @@
             <button
               type="button"
               class="list-edit-btn justify-self-center"
-              title="Modifier le profil"
-              :aria-label="`Modifier le profil de ${formatProfileDisplayName(user)}`"
+              title="Modifier compte et profil"
+              :aria-label="`Modifier ${formatProfileDisplayName(user)}`"
               @click.stop="openProfileEdit(user.id)"
             >
               <span class="material-symbols-outlined text-[20px] leading-none">edit</span>
@@ -277,6 +285,9 @@
             <div class="min-w-0 flex-1">
               <p class="font-medium text-brand-primary truncate">
                 {{ formatProfileDisplayName(user) }}
+              </p>
+              <p v-if="user.email" class="text-xs text-slate-500 truncate">
+                {{ user.email }}
               </p>
               <p class="text-xs text-slate-500 mt-0.5 truncate">
                 {{ user.gender ? genderLabel(user.gender) : 'Profil non renseigné' }}
