@@ -259,8 +259,18 @@ async function analyzePhoto() {
   try {
     const res = await coachAPI.analyzePhoto(activeUserId.value, imageBase64.value)
     result.value = res.data
-  } catch {
-    error.value = "Erreur lors de l'analyse. Vérifiez la connexion à l'API."
+  } catch (e) {
+    const detail = parseApiErrorDetail(e.response?.data?.detail)
+    const status = e.response?.status
+    if (status === 422) {
+      error.value =
+        detail ||
+        "Cette image ne correspond pas à un repas. Choisissez une photo de votre assiette ou de vos aliments."
+    } else {
+      error.value =
+        detail ||
+        "Erreur lors de l'analyse. Vérifiez la connexion à l'API."
+    }
   } finally {
     analyzing.value = false
   }

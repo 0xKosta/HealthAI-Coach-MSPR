@@ -320,7 +320,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
-import { useAuthStore } from '@/stores/authStore'
+import { useDisplayName } from '@/composables/useDisplayName'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import {
   isProfileIncomplete as checkProfileIncomplete,
@@ -342,7 +342,6 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
-const auth = useAuthStore()
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -353,12 +352,7 @@ const userLoading = ref(false)
 const userError = ref('')
 const user = computed(() => activeUser.value)
 
-const displayName = computed(() => {
-  if (!isAdminScope.value && auth.currentUser?.first_name) {
-    return auth.currentUser.first_name
-  }
-  return activeUser.value?.name
-})
+const displayName = useDisplayName(activeUser)
 
 const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
 

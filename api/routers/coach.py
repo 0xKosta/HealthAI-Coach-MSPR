@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from api.ai_client import client
 from api.database import get_db
-from api.models import User, BiometricMetric, WorkoutSession
+from api.models import User, UserAuth, BiometricMetric, WorkoutSession
 
 from api.biometrics import validate_user_biometrics
 from api.coach_utils import (
@@ -42,6 +42,63 @@ def _get_user_or_404(user_id: int, db: Session) -> User:
             detail=f"Utilisateur {user_id} introuvable",
         )
     return user
+
+
+def _get_user_display_name(user: User, db: Session) -> str:
+    """Prénom du compte auth lié (user_auth), sinon le nom du profil users."""
+    account = (
+        db.query(UserAuth)
+        .filter(UserAuth.user_id == user.id)
+        .first()
+    )
+    if account and account.first_name:
+        return account.first_name
+    return user.name
+
+
+def _strip_gpt_json_fence(raw: str) -> str:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    return text.strip()
+
+
+def _is_gpt_refusal(text: str) -> bool:
+    lower = text.lower()
+    markers = (
+        "je ne peux pas",
+        "i can't",
+        "i cannot",
+        "unable to help",
+        "unable to assist",
+        "désolé",
+        "sorry",
+        "pas une photo de repas",
+        "not a meal",
+        "not food",
+        "pas de nourriture",
+    )
+    return any(m in lower for m in markers)
+
+
+def _parse_photo_gpt_json(raw: str) -> dict:
+    cleaned = _strip_gpt_json_fence(raw)
+    if not cleaned or _is_gpt_refusal(cleaned):
+        raise ValueError("not_a_meal")
+    return json.loads(cleaned)
+
+
+def _coach_tone(display_name: str) -> str:
+    """Consignes communes : coach personnel, tutoiement, pas de 3e personne."""
+    return (
+        f"Tu t'adresses directement à {display_name} en le/la tutoyant "
+        f"(tu, ton, ta, tes). Parle-lui comme un coach personnel dédié : "
+        f"ne parle jamais de lui/elle à la troisième personne "
+        f"(évite « {display_name} a… », « il/elle », « son/sa » pour décrire l'utilisateur). "
+        f"Tu peux utiliser son prénom avec le tutoiement."
+    )
 
 
 def _ensure_profile_ready_for_ai(user: User) -> None:
@@ -81,6 +138,11 @@ GOAL_LABELS = {
     "sleep_improvement": "amélioration du sommeil",
     "maintenance":       "maintien de la forme",
 }
+
+NOT_A_MEAL_DETAIL = (
+    "Cette image ne correspond pas à un repas. "
+    "Choisissez une photo de votre assiette ou de vos aliments."
+)
 
 
 # =============================================================================
@@ -215,6 +277,7 @@ class MealPlanResponse(BaseModel):
 def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
+    display_name = _get_user_display_name(user, db)
 
     # — Rate limiting —
     if not coach_limiter.is_allowed(user.id):
@@ -225,11 +288,11 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
         )
 
     # — Cache —
-    cache_key = TTLCache.make_key(endpoint="advice", user_id=user.id)
+    cache_key = TTLCache.make_key(endpoint="advice", user_id=user.id, v="tu_coach")
     cached = advice_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/advice user_id=%s", user.id)
-        return CoachResponse(user_id=user.id, user_name=user.name, advice=cached)
+        return CoachResponse(user_id=user.id, user_name=display_name, advice=cached)
 
     # — Construction du prompt (inchangée) —
     last_metric = (
@@ -253,9 +316,10 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
     bmi_context = f", un IMC de {user.bmi:.1f}" if user.bmi is not None else ""
     prompt = (
         f"Tu es un coach santé bienveillant et expert. "
-        f"L'utilisateur s'appelle {user.name}, il a {user.age} ans{bmi_context}, "
-        f"son objectif est : {goal_fr}.{metric_context} "
-        f"Donne-lui un conseil personnalisé, concret et motivant en français, "
+        f"Ton interlocuteur s'appelle {display_name}, il/elle a {user.age} ans{bmi_context}, "
+        f"objectif : {goal_fr}.{metric_context} "
+        f"{_coach_tone(display_name)} "
+        f"Donne un conseil personnalisé, concret et motivant en français, "
         f"en 3 à 5 phrases maximum."
     )
 
@@ -272,7 +336,7 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
         logger.error("Erreur OpenAI /advice : %s", exc, exc_info=True)
         advice_text = get_fallback_advice(user.goal)  # fallback au lieu de 502
 
-    return CoachResponse(user_id=user.id, user_name=user.name, advice=advice_text)
+    return CoachResponse(user_id=user.id, user_name=display_name, advice=advice_text)
 
 
 # =============================================================================
@@ -292,6 +356,7 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
 def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
+    display_name = _get_user_display_name(user, db)
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
 
     try:
@@ -306,18 +371,23 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
     system_prompt = (
         "Tu es un nutritionniste expert et un assistant IA. "
         "Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, "
-        "sans balises markdown, sans explication. "
+        "sans balises markdown, sans refus en texte libre. "
         "Le JSON doit avoir exactement ces clés : "
+        "\"is_meal\" (booléen), "
         "\"foods_detected\" (liste de strings en français), "
         "\"macros\" (objet avec calories:int, protein_g:float, carbs_g:float, fat_g:float), "
-        "\"advice\" (string, conseil nutritionnel en français, 2 à 4 phrases)."
+        "\"advice\" (string). "
+        "Si l'image n'est PAS un repas ou de la nourriture (voiture, animal, paysage, objet, etc.), "
+        "réponds avec is_meal=false, foods_detected=[], macros à 0, advice=\"\". "
+        "Sinon is_meal=true : identifie les aliments, estime les macros, "
+        "advice en 2 à 4 phrases, tutoiement, 2e personne."
     )
 
     user_prompt = (
-        f"Analyse cette photo de repas. "
-        f"L'utilisateur s'appelle {user.name}, son objectif est : {goal_fr}. "
-        f"Identifie les aliments visibles, estime les macros pour la portion visible, "
-        f"puis donne un conseil nutritionnel adapté à son objectif."
+        f"Analyse cette photo pour {display_name} (objectif : {goal_fr}). "
+        f"{_coach_tone(display_name)} "
+        f"Si ce n'est pas un repas, renvoie is_meal=false (JSON uniquement). "
+        f"Sinon identifie les aliments, estime les macros, rédige advice pour {display_name}."
     )
 
     raw = ""
@@ -344,30 +414,41 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
             max_tokens=500,
         )
 
-        raw = response.choices[0].message.content.strip()
+        raw = (response.choices[0].message.content or "").strip()
+        parsed = _parse_photo_gpt_json(raw)
 
-        # GPT peut parfois envelopper le JSON dans des backticks malgré le system prompt
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip()
-
-        parsed = json.loads(raw)
-
+    except ValueError:
+        logger.info("Photo non reconnue comme repas — user_id=%s : %s", user.id, raw[:120])
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=NOT_A_MEAL_DETAIL,
+        )
     except json.JSONDecodeError as exc:
         logger.error("Réponse GPT non parseable : %s", raw, exc_info=True)
+        if raw and _is_gpt_refusal(raw):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=NOT_A_MEAL_DETAIL,
+            ) from exc
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="La réponse GPT n'est pas un JSON valide. Réessayez.",
-        )
+            detail="La réponse IA est invalide. Réessayez dans quelques instants.",
+        ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Erreur OpenAI /analyze-photo : %s", exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if not parsed.get("is_meal", True):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=NOT_A_MEAL_DETAIL,
+        )
 
     return PhotoResponse(
         user_id=user.id,
-        user_name=user.name,
+        user_name=display_name,
         foods_detected=parsed.get("foods_detected", []),
         macros=Macros(**parsed["macros"]),
         advice=parsed.get("advice", ""),
@@ -391,6 +472,7 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
 def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
+    display_name = _get_user_display_name(user, db)
 
     if not coach_limiter.is_allowed(user.id):
         raise HTTPException(
@@ -403,11 +485,12 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         equipment=payload.equipment,
         days=payload.days_per_week,
+        v="tu_coach",
     )
     cached = workout_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/workout-plan user_id=%s", user.id)
-        return WorkoutResponse(user_id=user.id, user_name=user.name, plan=cached)
+        return WorkoutResponse(user_id=user.id, user_name=display_name, plan=cached)
 
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
     equipment_fr = EQUIPMENT_LABELS.get(payload.equipment, payload.equipment)
@@ -430,9 +513,11 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
     prompt = (
         f"Tu es un coach sportif expert. "
         f"Génère un programme d'entraînement hebdomadaire en français, formaté en Markdown. "
-        f"Profil : {user.name}, {user.age} ans{bmi_context}, objectif {goal_fr}.{bio_context} "
+        f"Profil : {display_name}, {user.age} ans{bmi_context}, objectif {goal_fr}.{bio_context} "
         f"Matériel disponible : {equipment_fr}. "
         f"Nombre de séances par semaine : {payload.days_per_week}. "
+        f"{_coach_tone(display_name)} "
+        f"Titre et texte du programme : s'adresser à {display_name} (ex. « Ton programme », « Tu peux… »). "
         f"Inclure : jours, exercices avec séries/répétitions, temps de repos, conseil récupération."
     )
 
@@ -448,7 +533,7 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
         logger.error("Erreur OpenAI /workout-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_WORKOUT
 
-    return WorkoutResponse(user_id=user.id, user_name=user.name, plan=plan_text)
+    return WorkoutResponse(user_id=user.id, user_name=display_name, plan=plan_text)
 
 
 # =============================================================================
@@ -468,6 +553,7 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
 def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
+    display_name = _get_user_display_name(user, db)
 
     # — Rate limiting —
     if not coach_limiter.is_allowed(user.id):
@@ -483,11 +569,12 @@ def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         budget=payload.budget_euros,
         allergies=sorted(payload.allergies),  # sorted pour que ["gluten","lactose"]
+        v="tu_coach",
     )                                          # == ["lactose","gluten"] → même clé
     cached = meal_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/meal-plan user_id=%s", user.id)
-        return MealPlanResponse(user_id=user.id, user_name=user.name, plan=cached)
+        return MealPlanResponse(user_id=user.id, user_name=display_name, plan=cached)
 
     # — Contexte utilisateur —
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
@@ -500,9 +587,10 @@ def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
     prompt = (
         f"Tu es un nutritionniste expert. "
         f"Génère un plan de repas sur 7 jours en français, formaté en Markdown. "
-        f"Profil : {user.name}, {user.age} ans{bmi_context}, objectif {goal_fr}. "
+        f"Profil : {display_name}, {user.age} ans{bmi_context}, objectif {goal_fr}. "
         f"Budget : {payload.budget_euros:.0f}€ pour la semaine. "
         f"Allergies et intolérances à exclure absolument : {allergies_fr}. "
+        f"{_coach_tone(display_name)} "
         f"Le plan doit inclure : petit-déjeuner, déjeuner, dîner et collation pour chaque jour, "
         f"les calories estimées par jour, et 2 conseils pratiques pour respecter le budget. "
         f"Sois concret, varié et adapté à l'objectif."
@@ -520,7 +608,7 @@ def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
         logger.error("Erreur OpenAI /meal-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_MEAL
 
-    return MealPlanResponse(user_id=user.id, user_name=user.name, plan=plan_text)
+    return MealPlanResponse(user_id=user.id, user_name=display_name, plan=plan_text)
 
 
 # =============================================================================
@@ -540,6 +628,7 @@ def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
 def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
     _ensure_profile_ready_for_ai(user)
+    display_name = _get_user_display_name(user, db)
 
     if not coach_limiter.is_allowed(user.id):
         raise HTTPException(
@@ -547,11 +636,11 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
             detail="Quota atteint : 10 appels IA par heure.",
         )
 
-    cache_key = TTLCache.make_key(endpoint="trend", user_id=user.id)
+    cache_key = TTLCache.make_key(endpoint="trend", user_id=user.id, v="tu_coach")
     cached = trend_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/biometric-trend user_id=%s", user.id)
-        return TrendResponse(user_id=user.id, user_name=user.name, analysis=cached)
+        return TrendResponse(user_id=user.id, user_name=display_name, analysis=cached)
 
     since = date.today() - timedelta(days=30)
     metrics = (
@@ -583,10 +672,14 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
 
     prompt = (
         f"Tu es un coach santé expert. "
-        f"Données biométriques 30 jours de {user.name} (objectif : {goal_fr}) :\n\n"
+        f"Voici les données biométriques des 30 derniers jours de ton client {display_name} "
+        f"(objectif : {goal_fr}) — utilise-les pour lui répondre directement :\n\n"
         f"{chr(10).join(data_lines)}\n\n"
-        f"Analyse les tendances, identifie les évolutions positives et points d'attention, "
-        f"donne 2–3 conseils concrets. Markdown accepté. 200 mots max."
+        f"{_coach_tone(display_name)} "
+        f"Analyse ses tendances en lui parlant (ex. « Tu as… », « Ton poids… », « Ta FC… »), "
+        f"identifie les évolutions positives et points d'attention, "
+        f"donne 2–3 conseils concrets. Pas de titre du type « Analyse d'Alice ». "
+        f"Markdown accepté. 200 mots max."
     )
 
     try:
@@ -601,4 +694,4 @@ def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
         logger.error("Erreur OpenAI /biometric-trend : %s", exc, exc_info=True)
         analysis_text = FALLBACK_TREND
 
-    return TrendResponse(user_id=user.id, user_name=user.name, analysis=analysis_text)
+    return TrendResponse(user_id=user.id, user_name=display_name, analysis=analysis_text)

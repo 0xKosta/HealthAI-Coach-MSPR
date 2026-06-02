@@ -143,8 +143,8 @@ FALLBACK_WORKOUT = (
 
 FALLBACK_TREND = (
     "L'analyse IA des tendances est temporairement indisponible. "
-    "Consultez directement les graphiques pour suivre l'évolution "
-    "de votre poids, de votre sommeil et de votre fréquence cardiaque au repos."
+    "Consulte directement les graphiques pour suivre l'évolution "
+    "de ton poids, de ton sommeil et de ta fréquence cardiaque au repos."
 )
 
 

@@ -126,9 +126,11 @@
 ::-webkit-scrollbar-thumb:hover { background: #00B4D8; }
 
 /* Prose IA — texte sur fond sombre (ai-card) */
-.ai-prose h1, .ai-prose h2, .ai-prose h3 {
+.ai-prose h1, .ai-prose h2, .ai-prose h3, .ai-prose h4, .ai-prose h5 {
   @apply font-bold text-brand-accent mb-2 mt-4;
 }
+.ai-prose h4 { @apply text-base; }
+.ai-prose h5 { @apply text-sm; }
 .ai-prose p    { @apply text-slate-200 mb-3 leading-relaxed; }
 .ai-prose ul, .ai-prose ol { @apply pl-5 mb-3 space-y-1; }
 .ai-prose li   { @apply text-slate-200; }

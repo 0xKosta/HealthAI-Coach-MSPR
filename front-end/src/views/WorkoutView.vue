@@ -69,7 +69,7 @@
       </div>
       <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between gap-4">
         <p class="text-sm text-slate-600">
-          <span class="font-medium text-brand-primary">{{ currentUser?.name }}</span>
+          <span class="font-medium text-brand-primary">{{ displayName }}</span>
           · {{ goalLabels[currentUser?.goal] }} · {{ form.daysPerWeek }}j/semaine
         </p>
         <button @click="generatePlan" :disabled="generating" class="btn-primary">
@@ -111,6 +111,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
+import { useDisplayName } from '@/composables/useDisplayName'
 import {
   isProfileIncomplete,
   getProfileEditPath,
@@ -151,6 +152,7 @@ const profileIssues = computed(() => getProfileIssues(currentUser.value))
 const profileGateDescription = computed(() =>
   hasInvalidProfile.value ? PROFILE_INVALID_MSG : PROFILE_AI_REQUIRED_MSG
 )
+const displayName = useDisplayName(currentUser)
 
 const equipmentOptions = [
   { value: 'none',       label: 'Aucun',         icon: 'self_improvement' },

@@ -179,8 +179,46 @@ def test_coach_advice_success(client, created_user):
     assert response.status_code == 200
     data = response.json()
     assert data["user_id"] == created_user["id"]
+    assert data["user_name"] == created_user["name"]
     assert "advice" in data
     assert len(data["advice"]) > 0
+
+
+def test_coach_advice_uses_auth_first_name(client, created_user):
+    """Le prompt IA doit utiliser le prénom user_auth, pas User_XXXXXX."""
+    from tests.conftest import TestingSessionLocal
+    from api.models import User, UserAuth
+    from api.routers.auth import hash_password
+
+    db = TestingSessionLocal()
+    profile = db.query(User).filter(User.id == created_user["id"]).first()
+    profile.name = "User_000099"
+    db.add(
+        UserAuth(
+            user_id=profile.id,
+            email="alice.coach@test.local",
+            password_hash=hash_password("testpass"),
+            first_name="Alice",
+            last_name="Martin",
+        )
+    )
+    db.commit()
+    db.close()
+
+    from api.routers import coach as coach_module
+    coach_module.advice_cache._store.clear()
+
+    mock_resp = _mock_openai_response("Bonjour Alice !")
+    with patch("api.routers.coach.client") as mock_client:
+        mock_client.chat.completions.create.return_value = mock_resp
+        response = client.post("/coach/advice", json={"user_id": created_user["id"]})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user_name"] == "Alice"
+    prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+    assert "Alice" in prompt
+    assert "User_000099" not in prompt
+    assert "tutoyant" in prompt.lower() or "tu " in prompt.lower()
 
 
 def test_coach_workout_plan_success(client, created_user):
@@ -259,8 +297,38 @@ def test_coach_analyze_photo_rejects_text_base64(client, created_user):
     assert "image" in response.json()["detail"].lower()
 
 
+def test_coach_analyze_photo_not_a_meal(client, created_user):
+    mock_resp = _mock_openai_response(json.dumps({
+        "is_meal": False,
+        "foods_detected": [],
+        "macros": {"calories": 0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0},
+        "advice": "",
+    }))
+    with patch("api.routers.coach.client") as mock_client:
+        mock_client.chat.completions.create.return_value = mock_resp
+        response = client.post("/coach/analyze-photo", json={
+            "user_id": created_user["id"],
+            "image_base64": VALID_PNG_B64,
+        })
+    assert response.status_code == 422
+    assert "repas" in response.json()["detail"].lower()
+
+
+def test_coach_analyze_photo_gpt_refusal(client, created_user):
+    mock_resp = _mock_openai_response("Je ne peux pas t'aider avec ça.")
+    with patch("api.routers.coach.client") as mock_client:
+        mock_client.chat.completions.create.return_value = mock_resp
+        response = client.post("/coach/analyze-photo", json={
+            "user_id": created_user["id"],
+            "image_base64": VALID_PNG_B64,
+        })
+    assert response.status_code == 422
+    assert "repas" in response.json()["detail"].lower()
+
+
 def test_coach_analyze_photo_success(client, created_user):
     mock_resp = _mock_openai_response(json.dumps({
+        "is_meal": True,
         "foods_detected": ["salade"],
         "macros": {"calories": 120, "protein_g": 5.0, "carbs_g": 10.0, "fat_g": 7.0},
         "advice": "Repas équilibré.",
