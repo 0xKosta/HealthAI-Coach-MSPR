@@ -6,6 +6,45 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
+// Clé de stockage du token JWT (partagée avec authStore)
+export const TOKEN_KEY = 'healthai_token'
+
+// Attache automatiquement le token JWT à chaque requête sortante
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Sur 401, on purge le token : la session est invalide ou expirée.
+// La redirection vers /login est gérée par le guard de navigation.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY)
+    }
+    return Promise.reject(error)
+  }
+)
+
+export const authAPI = {
+  register: (data) => api.post('/auth/register', data),
+  // /auth/login attend un form OAuth2 (username = email) — pas du JSON
+  login: (email, password) => {
+    const form = new URLSearchParams()
+    form.append('username', email)
+    form.append('password', password)
+    return api.post('/auth/login', form, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+  },
+  me: () => api.get('/auth/me'),
+  updateMe: (data) => api.put('/auth/me', data)
+}
+
 export const usersAPI = {
   getAll: (params) => api.get('/users/', { params }),
   getById: (id) => api.get(`/users/${id}`)

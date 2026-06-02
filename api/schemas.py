@@ -18,7 +18,7 @@ class UserCreate(BaseModel):
     """Données requises pour créer ou mettre à jour un utilisateur (POST / PUT /users)."""
 
     name: str = Field(..., max_length=100)
-    age: int = Field(..., ge=0, le=120)
+    age: Optional[int] = Field(None, ge=0, le=120)  # Null à l'inscription, complété ensuite
     gender: Optional[Literal["male", "female", "other"]] = None
     weight_kg: Optional[float] = Field(None, gt=0)
     height_cm: Optional[float] = Field(None, gt=0)

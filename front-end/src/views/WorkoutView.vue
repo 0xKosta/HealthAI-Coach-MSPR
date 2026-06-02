@@ -8,7 +8,7 @@
         <p class="text-slate-600 mt-1">Générez un plan IA personnalisé selon votre profil et vos objectifs</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+        <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
     </div>
 
@@ -94,6 +94,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useDashboardScope } from '@/composables/useDashboardScope'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -101,6 +102,7 @@ import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 
 const userStore = useUserStore()
+const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
 const activeUserId = ref(null)
@@ -170,7 +172,7 @@ async function loadUserProfile() {
 }
 
 function goToUsersList() {
-  router.push('/admin')
+  router.push(isAdminScope.value ? '/admin' : '/')
 }
 
 watch(() => route.params.userId, async () => {

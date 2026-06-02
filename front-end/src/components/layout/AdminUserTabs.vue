@@ -15,24 +15,28 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useDashboardScope } from '@/composables/useDashboardScope'
 
 const props = defineProps({
   userId: { type: Number, required: true },
 })
 
 const route = useRoute()
+const { basePath } = useDashboardScope()
+
+const base = computed(() => basePath(props.userId))
 
 const tabs = computed(() => [
-  { label: 'Dashboard', to: `/admin/dashboard/${props.userId}` },
-  { label: 'Nutrition', to: `/admin/dashboard/${props.userId}/nutrition` },
-  { label: 'Entraînement', to: `/admin/dashboard/${props.userId}/workout` },
-  { label: 'Tendances', to: `/admin/dashboard/${props.userId}/trends` },
+  { label: 'Dashboard', to: base.value },
+  { label: 'Nutrition', to: `${base.value}/nutrition` },
+  { label: 'Entraînement', to: `${base.value}/workout` },
+  { label: 'Tendances', to: `${base.value}/trends` },
 ])
 
 function isActive(tab) {
   if (tab.to.includes('/workout')) return route.path.includes('/workout')
   if (tab.to.includes('/nutrition')) return route.path.includes('/nutrition')
   if (tab.to.includes('/trends')) return route.path.includes('/trends')
-  return /^\/admin\/dashboard\/\d+$/.test(route.path)
+  return /\/dashboard\/\d+$/.test(route.path)
 }
 </script>

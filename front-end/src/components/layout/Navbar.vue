@@ -6,7 +6,7 @@
 
         <!-- Logo — centré mobile, à gauche desktop -->
         <RouterLink
-          to="/admin"
+          :to="homeLink"
           class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:static sm:translate-x-0 sm:translate-y-0 flex items-center"
         >
           <img
@@ -34,10 +34,21 @@
           </RouterLink>
         </div>
 
-        <!-- Indicateur statut -->
-        <div class="ml-auto flex items-center gap-2 text-xs text-slate-400 relative z-10">
-          <span class="w-2 h-2 rounded-full bg-brand-success animate-pulse-slow"></span>
-          <span class="hidden lg:block">API connectée</span>
+        <!-- Compte + déconnexion -->
+        <div class="ml-auto flex items-center gap-3 relative z-10">
+          <span v-if="auth.currentUser" class="hidden md:block text-xs text-slate-300">
+            {{ auth.currentUser.first_name }} {{ auth.currentUser.last_name }}
+            <span v-if="auth.isAdmin" class="ml-1 px-1.5 py-0.5 rounded bg-brand-accent/20 text-brand-accent text-[10px] font-semibold uppercase">Admin</span>
+          </span>
+          <button
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+            @click="logout"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span class="hidden sm:inline">Déconnexion</span>
+          </button>
         </div>
       </div>
     </div>
@@ -64,25 +75,49 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 
-const navLinks = computed(() => [
-  {
-    to: '/admin', label: 'Utilisateurs', shortLabel: 'Users',
-    icon: '<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
-  },
-  {
-    to: '/exercises', label: 'Exercices', shortLabel: 'Exercices',
-    icon: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>'
-  },
-])
+const dashboardIcon = '<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
+const exercisesIcon = '<circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/>'
+
+const homeLink = computed(() => {
+  if (auth.isAdmin) return '/admin'
+  if (auth.profileId) return `/dashboard/${auth.profileId}`
+  return '/'
+})
+
+const navLinks = computed(() => {
+  if (auth.isAdmin) {
+    return [
+      { to: '/admin', label: 'Utilisateurs', shortLabel: 'Users', icon: dashboardIcon },
+      { to: '/exercises', label: 'Exercices', shortLabel: 'Exercices', icon: exercisesIcon },
+    ]
+  }
+  const links = []
+  if (auth.profileId) {
+    links.push({ to: `/dashboard/${auth.profileId}`, label: 'Mon espace', shortLabel: 'Accueil', icon: dashboardIcon })
+  }
+  links.push({ to: '/exercises', label: 'Exercices', shortLabel: 'Exercices', icon: exercisesIcon })
+  return links
+})
 
 function isActive(link) {
   if (link.to === '/admin') {
     return route.path === '/admin' || route.path.startsWith('/admin/dashboard/')
   }
+  if (link.to.startsWith('/dashboard/')) {
+    return route.path.startsWith('/dashboard/')
+  }
   return route.path.startsWith(link.to)
+}
+
+function logout() {
+  auth.logout()
+  router.push('/login')
 }
 </script>

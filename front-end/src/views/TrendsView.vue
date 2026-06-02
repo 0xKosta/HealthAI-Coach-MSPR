@@ -20,7 +20,7 @@
           </span>
           <span class="font-medium text-brand-primary">{{ currentUser.name }}</span>
         </div>
-        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+        <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
     </div>
 
@@ -123,6 +123,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useDashboardScope } from '@/composables/useDashboardScope'
 import { metricsAPI, coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -131,6 +132,7 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
+const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
 const allMetrics = ref([])
@@ -249,7 +251,7 @@ function parseUserIdFromRoute() {
 }
 
 function goToUsersList() {
-  router.push('/admin')
+  router.push(isAdminScope.value ? '/admin' : '/')
 }
 
 async function loadUserProfile() {

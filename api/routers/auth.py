@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.models import UserAuth
+from api.models import User, UserAuth
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,6 +106,7 @@ class MeResponse(BaseModel):
     first_name: str
     last_name: str
     avatar_url: str | None
+    user_id: int | None  # Profil santé lié (users.id) — null si compte sans profil
 
 
 # =============================================================================
@@ -126,17 +127,32 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             detail="Un compte existe déjà avec cet email.",
         )
 
-    user = UserAuth(
-        email=payload.email,
-        password_hash=hash_password(payload.password),
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    # Création couplée, en une seule transaction :
+    #   1. un profil santé `users` VIDE (à compléter ensuite par l'utilisateur)
+    #   2. le compte `user_auth` lié à ce profil (user_id obligatoire en base)
+    try:
+        # Nom au même format que les profils existants : User_000974 (id sur 6 chiffres).
+        # On insère d'abord pour obtenir l'id auto-généré, puis on fixe le nom.
+        profile = User(name="")
+        db.add(profile)
+        db.flush()  # obtient profile.id sans valider la transaction
+        profile.name = f"User_{profile.id:06d}"
 
-    token = create_token(user.id)
+        account = UserAuth(
+            user_id=profile.id,
+            email=payload.email,
+            password_hash=hash_password(payload.password),
+            first_name=payload.first_name,
+            last_name=payload.last_name,
+        )
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+    except Exception:
+        db.rollback()
+        raise
+
+    token = create_token(account.id)
     return TokenResponse(access_token=token)
 
 
@@ -174,6 +190,7 @@ def me(current_user: UserAuth = Depends(get_current_user)):
         first_name=current_user.first_name,
         last_name=current_user.last_name,
         avatar_url=current_user.avatar_url,
+        user_id=current_user.user_id,
     )
     
 # =============================================================================
@@ -283,4 +300,5 @@ def update_me(
         first_name=current_user.first_name,
         last_name=current_user.last_name,
         avatar_url=current_user.avatar_url,
+        user_id=current_user.user_id,
     )

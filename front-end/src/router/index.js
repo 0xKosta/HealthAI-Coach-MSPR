@@ -5,25 +5,87 @@ import WorkoutView from '@/views/WorkoutView.vue'
 import ExercisesView from '@/views/ExercisesView.vue'
 import TrendsView from '@/views/TrendsView.vue'
 import TrendsUsersView from '@/views/TrendsUsersView.vue'
+import LoginView from '@/views/LoginView.vue'
+import RegisterView from '@/views/RegisterView.vue'
+import NoProfileView from '@/views/NoProfileView.vue'
+import { useAuthStore } from '@/stores/authStore'
+import { resolvePostAuthRoute } from '@/router/redirect'
 
 const routes = [
-  { path: '/', redirect: '/admin' },
-  { path: '/admin',                          name: 'AdminUsers', component: TrendsUsersView },
-  { path: '/admin/dashboard/:userId',        name: 'Dashboard',  component: DashboardView },
-  { path: '/admin/dashboard/:userId/trends', name: 'Trends',     component: TrendsView },
-  { path: '/admin/dashboard/:userId/nutrition', name: 'Nutrition', component: NutritionView },
-  { path: '/admin/dashboard/:userId/workout',   name: 'Workout',   component: WorkoutView },
-  { path: '/exercises',  name: 'Exercises', component: ExercisesView },
-  { path: '/dashboard/:userId',         redirect: (to) => `/admin/dashboard/${to.params.userId}` },
-  { path: '/dashboard/:userId/trends',  redirect: (to) => `/admin/dashboard/${to.params.userId}/trends` },
-  { path: '/nutrition',                 redirect: '/admin' },
-  { path: '/workout',                   redirect: '/admin' },
-  { path: '/trends',                    redirect: '/admin' },
-  { path: '/trends/:userId',            redirect: (to) => `/admin/dashboard/${to.params.userId}/trends` },
+  // — Auth (accessible uniquement aux visiteurs non connectés) —
+  { path: '/login',    name: 'Login',    component: LoginView,    meta: { guestOnly: true, public: true } },
+  { path: '/register', name: 'Register', component: RegisterView, meta: { guestOnly: true, public: true } },
+
+  // — Espace utilisateur (connecté) —
+  { path: '/dashboard/:userId',           name: 'Dashboard',     component: DashboardView, meta: { requiresAuth: true } },
+  { path: '/dashboard/:userId/nutrition', name: 'Nutrition',     component: NutritionView, meta: { requiresAuth: true } },
+  { path: '/dashboard/:userId/workout',   name: 'Workout',       component: WorkoutView,   meta: { requiresAuth: true } },
+  { path: '/dashboard/:userId/trends',    name: 'Trends',        component: TrendsView,    meta: { requiresAuth: true } },
+  { path: '/exercises',                   name: 'Exercises',     component: ExercisesView, meta: { requiresAuth: true } },
+  { path: '/no-profile',                  name: 'NoProfile',     component: NoProfileView, meta: { requiresAuth: true } },
+
+  // — Back-office admin (connecté + rôle admin) —
+  { path: '/admin',                             name: 'AdminUsers',      component: TrendsUsersView, meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/dashboard/:userId',           name: 'AdminDashboard',  component: DashboardView,   meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/dashboard/:userId/trends',    name: 'AdminTrends',     component: TrendsView,      meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/dashboard/:userId/nutrition', name: 'AdminNutrition',  component: NutritionView,   meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/dashboard/:userId/workout',   name: 'AdminWorkout',    component: WorkoutView,     meta: { requiresAuth: true, requiresAdmin: true } },
+
+  // — Racine : redirige selon l'état d'authentification (géré dans le guard) —
+  { path: '/', name: 'Root', redirect: () => '/login' },
+
+  // — Fallback —
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
-export default createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 })
+  scrollBehavior: () => ({ top: 0 }),
 })
+
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
+
+  // Réhydratation au rechargement : token présent mais profil non chargé
+  if (auth.isAuthenticated && !auth.currentUser) {
+    await auth.fetchMe()
+  }
+
+  // Racine → redirection contextuelle
+  if (to.name === 'Root') {
+    return auth.isAuthenticated ? resolvePostAuthRoute(auth) : '/login'
+  }
+
+  // Pages visiteurs (login/register) : rediriger si déjà connecté
+  if (to.meta.guestOnly && auth.isAuthenticated) {
+    return resolvePostAuthRoute(auth)
+  }
+
+  // Routes protégées
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // Routes admin
+  if (to.meta.requiresAdmin && !auth.isAdmin) {
+    return resolvePostAuthRoute(auth)
+  }
+
+  // Espace utilisateur : on ne peut consulter que SON propre profil
+  // (l'admin garde l'accès à tous les profils via /admin/...)
+  if (
+    to.path.startsWith('/dashboard/') &&
+    !auth.isAdmin &&
+    to.params.userId !== undefined
+  ) {
+    if (!auth.profileId) return '/no-profile'
+    if (Number(to.params.userId) !== auth.profileId) {
+      return `/dashboard/${auth.profileId}`
+    }
+  }
+
+  return true
+})
+
+export default router

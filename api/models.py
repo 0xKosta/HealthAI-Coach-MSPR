@@ -21,7 +21,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    age: Mapped[int | None] = mapped_column(Integer)  # Null à l'inscription, complété ensuite
     gender: Mapped[str | None] = mapped_column(String(10))
     weight_kg: Mapped[float | None] = mapped_column(Float)
     height_cm: Mapped[float | None] = mapped_column(Float)

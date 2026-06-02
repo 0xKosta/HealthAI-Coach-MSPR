@@ -8,7 +8,7 @@
         <p class="text-slate-600 mt-1">Vue d'ensemble santé de l'utilisateur sélectionné</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+        <button v-if="isAdminScope" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
     </div>
 
@@ -36,19 +36,19 @@
 
           <div class="grid grid-cols-2 gap-3">
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ user.age }}</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ user.age ?? '—' }}</p>
               <p class="text-xs text-slate-600">ans</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold" :class="bmiColor">{{ user.bmi?.toFixed(1) }}</p>
+              <p class="text-2xl font-bold" :class="bmiColor">{{ user.bmi?.toFixed(1) ?? '—' }}</p>
               <p class="text-xs text-slate-600">IMC</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ user.weight_kg }} kg</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ user.weight_kg != null ? `${user.weight_kg} kg` : '—' }}</p>
               <p class="text-xs text-slate-600">Poids</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ (user.height_cm / 100).toFixed(2) }} m</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ user.height_cm != null ? `${(user.height_cm / 100).toFixed(2)} m` : '—' }}</p>
               <p class="text-xs text-slate-600">Taille</p>
             </div>
           </div>
@@ -141,6 +141,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useDashboardScope } from '@/composables/useDashboardScope'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -149,6 +150,7 @@ import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 
 const userStore = useUserStore()
+const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
 const activeUserId = ref(null)
@@ -183,7 +185,7 @@ async function loadUserProfile() {
 }
 
 function goToUsersList() {
-  router.push('/admin')
+  router.push(isAdminScope.value ? '/admin' : '/')
 }
 
 watch(() => route.params.userId, async () => {
