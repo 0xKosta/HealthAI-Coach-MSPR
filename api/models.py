@@ -31,10 +31,23 @@ class User(Base):
     created_at: Mapped[date] = mapped_column(Date, nullable=False, server_default=func.current_date())
 
     __table_args__ = (
-        CheckConstraint("age >= 0 AND age <= 120",              name="ck_users_age"),
+        CheckConstraint(
+            "age IS NULL OR (age >= 18 AND age <= 100)",
+            name="ck_users_age",
+        ),
         CheckConstraint("gender IN ('male', 'female', 'other')", name="ck_users_gender"),
-        CheckConstraint("weight_kg > 0",                        name="ck_users_weight_kg"),
-        CheckConstraint("height_cm > 0",                        name="ck_users_height_cm"),
+        CheckConstraint(
+            "weight_kg IS NULL OR (weight_kg >= 20 AND weight_kg <= 300)",
+            name="ck_users_weight_kg",
+        ),
+        CheckConstraint(
+            "height_cm IS NULL OR (height_cm >= 90 AND height_cm <= 230)",
+            name="ck_users_height_cm",
+        ),
+        CheckConstraint(
+            "bmi IS NULL OR (bmi >= 10 AND bmi <= 80)",
+            name="ck_users_bmi",
+        ),
         CheckConstraint("body_fat_pct >= 0 AND body_fat_pct <= 100", name="ck_users_body_fat_pct"),
         CheckConstraint(
             "goal IN ('weight_loss', 'muscle_gain', 'sleep_improvement', 'maintenance')",

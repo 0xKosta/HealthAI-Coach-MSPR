@@ -12,13 +12,28 @@
     <ErrorAlert v-else-if="loadError" :message="loadError" />
 
     <form v-else class="card space-y-6" @submit.prevent="onSubmit">
+      <ProfileDataWarning
+        v-if="loadedProfileIssues.length"
+        :issues="loadedProfileIssues"
+      />
       <ErrorAlert v-if="formError" :message="formError" />
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <!-- Âge -->
         <div>
           <label class="label" for="age">Âge</label>
-          <input id="age" v-model.number="form.age" type="number" min="0" max="120" class="input" placeholder="ex. 30" />
+          <input
+            id="age"
+            v-model.number="form.age"
+            type="number"
+            :min="limits.age.min"
+            :max="limits.age.max"
+            class="input"
+            :class="{ 'border-brand-error': fieldErrors.age }"
+            placeholder="ex. 30"
+            @input="clearFieldError('age')"
+          />
+          <p v-if="fieldErrors.age" class="text-xs text-brand-error mt-1">{{ fieldErrors.age }}</p>
         </div>
 
         <!-- Genre -->
@@ -35,13 +50,37 @@
         <!-- Poids -->
         <div>
           <label class="label" for="weight">Poids (kg)</label>
-          <input id="weight" v-model.number="form.weight_kg" type="number" min="1" step="0.1" class="input" placeholder="ex. 68.5" />
+          <input
+            id="weight"
+            v-model.number="form.weight_kg"
+            type="number"
+            :min="limits.weight_kg.min"
+            :max="limits.weight_kg.max"
+            step="0.1"
+            class="input"
+            :class="{ 'border-brand-error': fieldErrors.weight_kg }"
+            placeholder="ex. 68.5"
+            @input="clearFieldError('weight_kg')"
+          />
+          <p v-if="fieldErrors.weight_kg" class="text-xs text-brand-error mt-1">{{ fieldErrors.weight_kg }}</p>
         </div>
 
         <!-- Taille -->
         <div>
           <label class="label" for="height">Taille (cm)</label>
-          <input id="height" v-model.number="form.height_cm" type="number" min="1" step="0.1" class="input" placeholder="ex. 172" />
+          <input
+            id="height"
+            v-model.number="form.height_cm"
+            type="number"
+            :min="limits.height_cm.min"
+            :max="limits.height_cm.max"
+            step="0.1"
+            class="input"
+            :class="{ 'border-brand-error': fieldErrors.height_cm }"
+            placeholder="ex. 172"
+            @input="clearFieldError('height_cm')"
+          />
+          <p v-if="fieldErrors.height_cm" class="text-xs text-brand-error mt-1">{{ fieldErrors.height_cm }}</p>
         </div>
 
         <!-- Masse grasse -->
@@ -63,8 +102,13 @@
         </div>
       </div>
 
+      <p v-if="fieldErrors.bmi" class="text-sm text-brand-error">{{ fieldErrors.bmi }}</p>
+
       <!-- IMC calculé -->
-      <div class="flex items-center justify-between rounded-xl bg-brand-light border border-slate-200 px-4 py-3">
+      <div
+        class="flex items-center justify-between rounded-xl bg-brand-light border px-4 py-3"
+        :class="fieldErrors.bmi ? 'border-brand-error' : 'border-slate-200'"
+      >
         <div>
           <p class="text-sm font-medium text-brand-primary">IMC (calculé automatiquement)</p>
           <p class="text-xs text-slate-500">Basé sur le poids et la taille</p>
@@ -77,7 +121,7 @@
 
       <div class="flex justify-end gap-3 pt-2">
         <RouterLink :to="dashboardLink" class="btn-secondary">Annuler</RouterLink>
-        <button type="submit" :disabled="saving" class="btn-primary">
+        <button type="submit" :disabled="saving || !isFormValid" class="btn-primary">
           <div v-if="saving" class="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
           {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
         </button>
@@ -133,6 +177,13 @@ import { authAPI } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
+import ProfileDataWarning from '@/components/ui/ProfileDataWarning.vue'
+import {
+  BIOMETRIC_LIMITS,
+  computeBmi,
+  validateBiometricForm,
+  parseApiErrorDetail,
+} from '@/composables/useBiometricValidation'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -141,6 +192,10 @@ const loading = ref(true)
 const loadError = ref('')
 const saving = ref(false)
 const formError = ref('')
+const loadedProfileIssues = ref([])
+const fieldErrors = reactive({})
+
+const limits = BIOMETRIC_LIMITS
 
 const confirmOpen = ref(false)
 const deleting = ref(false)
@@ -159,12 +214,14 @@ const dashboardLink = computed(() =>
   auth.profileId ? `/dashboard/${auth.profileId}` : '/'
 )
 
-// IMC live = poids / (taille_m)²
 const bmi = computed(() => {
-  if (!form.weight_kg || !form.height_cm) return null
-  const h = form.height_cm / 100
-  const value = form.weight_kg / (h * h)
-  return Number.isFinite(value) ? value.toFixed(1) : null
+  const value = computeBmi(form.weight_kg, form.height_cm)
+  return value != null ? value.toFixed(1) : null
+})
+
+const isFormValid = computed(() => {
+  const { formError: err } = validateBiometricForm(form)
+  return !err
 })
 
 const bmiCategory = computed(() => {
@@ -185,20 +242,21 @@ const bmiColor = computed(() => {
   return 'text-brand-error'
 })
 
+function clearFieldError(key) {
+  delete fieldErrors[key]
+  if (key === 'weight_kg' || key === 'height_cm') {
+    delete fieldErrors.bmi
+  }
+}
+
 function validate() {
-  if (form.age != null && (form.age < 0 || form.age > 120)) {
-    return "L'âge doit être compris entre 0 et 120."
-  }
-  if (form.weight_kg != null && form.weight_kg <= 0) {
-    return 'Le poids doit être supérieur à 0.'
-  }
-  if (form.height_cm != null && form.height_cm <= 0) {
-    return 'La taille doit être supérieure à 0.'
-  }
   if (form.body_fat_pct != null && (form.body_fat_pct < 0 || form.body_fat_pct > 100)) {
     return 'La masse grasse doit être comprise entre 0 et 100.'
   }
-  return ''
+  const result = validateBiometricForm(form)
+  Object.keys(fieldErrors).forEach((k) => delete fieldErrors[k])
+  Object.assign(fieldErrors, result.fieldErrors)
+  return result.formError
 }
 
 // Convertit les chaînes vides / NaN en null (cohérence avec la base)
@@ -218,6 +276,7 @@ async function loadProfile() {
     form.height_cm = p.height_cm ?? null
     form.body_fat_pct = p.body_fat_pct ?? null
     form.goal = p.goal ?? null
+    loadedProfileIssues.value = Array.isArray(p.profile_issues) ? p.profile_issues : []
   } catch (e) {
     loadError.value =
       e.response?.status === 404
@@ -234,6 +293,7 @@ async function onSubmit() {
 
   saving.value = true
   try {
+    loadedProfileIssues.value = []
     await authAPI.updateProfile({
       age: clean(form.age),
       gender: clean(form.gender),
@@ -244,8 +304,9 @@ async function onSubmit() {
     })
     router.push(dashboardLink.value)
   } catch (e) {
+    const detail = e.response?.data?.detail
     formError.value =
-      e.response?.data?.detail || "Erreur lors de l'enregistrement du profil."
+      parseApiErrorDetail(detail) || "Erreur lors de l'enregistrement du profil."
   } finally {
     saving.value = false
   }

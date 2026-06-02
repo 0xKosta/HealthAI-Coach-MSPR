@@ -6,8 +6,10 @@
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Programme d'Entraînement</h1>
         <p class="text-slate-600 mt-1">
-          {{ profileIncomplete
-            ? 'Complétez votre profil pour générer un programme personnalisé'
+          {{ profileBlocksAi
+            ? (hasInvalidProfile
+              ? 'Corrigez votre profil pour générer un programme IA'
+              : 'Complétez votre profil pour générer un programme personnalisé')
             : 'Générez un plan IA personnalisé selon votre profil et vos objectifs' }}
         </p>
       </div>
@@ -22,11 +24,12 @@
     <ErrorAlert v-else-if="userError" :message="userError" />
 
     <ProfileAiGate
-      v-if="currentUser && profileIncomplete"
+      v-if="currentUser && profileBlocksAi"
       title="Génération de programme verrouillée"
-      :description="PROFILE_AI_REQUIRED_MSG"
+      :description="profileGateDescription"
+      :issues="profileIssues"
       :profile-edit-path="profileEditPath"
-      :cta-label="isAdminScope ? 'Modifier le profil' : 'Compléter mon profil'"
+      :cta-label="hasInvalidProfile ? 'Corriger le profil' : (isAdminScope ? 'Modifier le profil' : 'Compléter mon profil')"
     />
 
     <!-- Formulaire de configuration -->
@@ -82,7 +85,7 @@
     <ErrorAlert v-if="planError" :message="planError" />
 
     <!-- Résultat programme IA -->
-    <div v-if="plan && !profileIncomplete" class="card animate-slide-up">
+    <div v-if="plan && !profileBlocksAi" class="card animate-slide-up">
       <div class="flex items-center justify-between mb-5">
         <div>
           <h2 class="text-xl font-bold text-brand-primary">Votre programme</h2>
@@ -108,7 +111,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
-import { isProfileIncomplete, getProfileEditPath, PROFILE_AI_REQUIRED_MSG } from '@/composables/useProfileCompletion'
+import {
+  isProfileIncomplete,
+  getProfileEditPath,
+  blocksAiFeatures,
+  hasInvalidProfileData,
+  getProfileIssues,
+  PROFILE_AI_REQUIRED_MSG,
+  PROFILE_INVALID_MSG,
+} from '@/composables/useProfileCompletion'
+import { parseApiErrorDetail } from '@/composables/useBiometricValidation'
 import { coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
@@ -132,7 +144,13 @@ const planError = ref('')
 const plan = ref(null)
 
 const profileIncomplete = computed(() => isProfileIncomplete(currentUser.value))
+const profileBlocksAi = computed(() => blocksAiFeatures(currentUser.value))
+const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
 const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
+const profileIssues = computed(() => getProfileIssues(currentUser.value))
+const profileGateDescription = computed(() =>
+  hasInvalidProfile.value ? PROFILE_INVALID_MSG : PROFILE_AI_REQUIRED_MSG
+)
 
 const equipmentOptions = [
   { value: 'none',       label: 'Aucun',         icon: 'self_improvement' },
@@ -157,7 +175,7 @@ const daysLabel = computed(() => {
 })
 
 async function generatePlan() {
-  if (!activeUserId.value || profileIncomplete.value) return
+  if (!activeUserId.value || profileBlocksAi.value) return
   generating.value = true; planError.value = ''; plan.value = null
   try {
     const res = await coachAPI.getWorkoutPlan(activeUserId.value, form.value.equipment, form.value.daysPerWeek)
@@ -182,11 +200,16 @@ async function loadUserProfile() {
     const res = await usersAPI.getById(activeUserId.value)
     currentUser.value = res.data
     userStore.selectUser(activeUserId.value)
-    if (isProfileIncomplete(currentUser.value)) {
+    if (profileBlocksAi.value) {
       plan.value = null
     }
-  } catch {
-    userError.value = "Impossible de charger ce profil utilisateur."
+  } catch (e) {
+    const detail = parseApiErrorDetail(e.response?.data?.detail)
+    userError.value =
+      detail ||
+      (e.response?.status === 404
+        ? 'Profil utilisateur introuvable.'
+        : "Impossible de charger ce profil utilisateur.")
     currentUser.value = null
   } finally {
     userLoading.value = false

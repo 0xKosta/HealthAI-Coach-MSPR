@@ -15,6 +15,7 @@ from api.ai_client import client
 from api.database import get_db
 from api.models import User, BiometricMetric, WorkoutSession
 
+from api.biometrics import validate_user_biometrics
 from api.coach_utils import (
     advice_cache, workout_cache, trend_cache, meal_cache,
     coach_limiter,
@@ -41,6 +42,37 @@ def _get_user_or_404(user_id: int, db: Session) -> User:
             detail=f"Utilisateur {user_id} introuvable",
         )
     return user
+
+
+def _ensure_profile_ready_for_ai(user: User) -> None:
+    """Bloque les appels IA si le profil est incomplet ou biométriquement invalide."""
+    missing = []
+    if user.age is None:
+        missing.append("âge")
+    if user.weight_kg is None:
+        missing.append("poids")
+    if user.height_cm is None:
+        missing.append("taille")
+    if not user.goal:
+        missing.append("objectif")
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Profil incomplet : renseignez "
+                + ", ".join(missing)
+                + " pour utiliser le coach IA."
+            ),
+        )
+
+    err = validate_user_biometrics(
+        age=user.age,
+        weight_kg=user.weight_kg,
+        height_cm=user.height_cm,
+        bmi=user.bmi,
+    )
+    if err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
 
 
 GOAL_LABELS = {
@@ -182,6 +214,7 @@ class MealPlanResponse(BaseModel):
 )
 def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
+    _ensure_profile_ready_for_ai(user)
 
     # — Rate limiting —
     if not coach_limiter.is_allowed(user.id):
@@ -258,6 +291,7 @@ def get_ai_advice(payload: CoachRequest, db: Session = Depends(get_db)):
 )
 def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
+    _ensure_profile_ready_for_ai(user)
     goal_fr = GOAL_LABELS.get(user.goal or "", user.goal or "non renseigné")
 
     try:
@@ -356,6 +390,7 @@ def analyze_photo(payload: PhotoRequest, db: Session = Depends(get_db)):
 )
 def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
+    _ensure_profile_ready_for_ai(user)
 
     if not coach_limiter.is_allowed(user.id):
         raise HTTPException(
@@ -432,6 +467,7 @@ def get_workout_plan(payload: WorkoutRequest, db: Session = Depends(get_db)):
 )
 def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
+    _ensure_profile_ready_for_ai(user)
 
     # — Rate limiting —
     if not coach_limiter.is_allowed(user.id):
@@ -503,6 +539,7 @@ def get_meal_plan(payload: MealPlanRequest, db: Session = Depends(get_db)):
 )
 def get_biometric_trend(payload: CoachRequest, db: Session = Depends(get_db)):
     user = _get_user_or_404(payload.user_id, db)
+    _ensure_profile_ready_for_ai(user)
 
     if not coach_limiter.is_allowed(user.id):
         raise HTTPException(

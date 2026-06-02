@@ -75,11 +75,11 @@ Ces trois datasets couvrent les trois domaines metier de HealthAI Coach (nutriti
 
 | Colonne source | Colonne cible (BDD) | Type | Description |
 |----------------|---------------------|------|-------------|
-| Age | users.age | INTEGER | Age en annees |
+| Age | users.age | INTEGER | Age en annees (API : 18–100 si renseigne) |
 | Gender | users.gender | VARCHAR | Genre (normalise en minuscules) |
-| Weight (kg) | users.weight_kg | FLOAT | Poids en kilogrammes |
-| Height (m) | users.height_cm | FLOAT | Taille convertie en cm |
-| BMI | users.bmi | FLOAT | Indice de masse corporelle |
+| Weight (kg) | users.weight_kg | FLOAT | Poids en kg (API : 20–300) |
+| Height (m) | users.height_cm | FLOAT | Taille convertie en cm (API : 90–230) |
+| BMI | users.bmi | FLOAT | IMC calcule serveur (API : 10–80) |
 | Fat_Percentage | users.body_fat_pct | FLOAT | Pourcentage de masse grasse |
 | Experience_Level | users.experience_level | INTEGER | Niveau 1/2/3 |
 | Session_Duration (hours) | workout_sessions.duration_min | INTEGER | Converti en minutes |

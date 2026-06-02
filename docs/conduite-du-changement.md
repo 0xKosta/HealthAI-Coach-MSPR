@@ -81,6 +81,7 @@ HealthAI Coach répond à ces enjeux en proposant une solution **automatisée, i
 
 - **Qualité** : les données Kaggle sont nettoyées et validées lors de l'ETL ; un rapport qualité est généré à chaque run.
 - **Confidentialité** : les profils utilisateurs contiennent des données de santé sensibles (poids, BMI, BPM) — conformité RGPD à assurer.
+- **Qualité des données** : validation biométrique à la saisie (âge, taille, poids, IMC) et verrouillage des modules IA tant que le profil est incomplet ou incohérent — voir [`validation-biometrique.md`](./validation-biometrique.md).
 - **Intégrité** : l'ETL est idempotent (TRUNCATE + reload) — risque de perte temporaire de données lors d'un run raté.
 - **Disponibilité** : dépendance à Supabase (SaaS) — SLA à surveiller.
 

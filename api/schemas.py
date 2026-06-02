@@ -6,7 +6,17 @@
 
 from datetime import date
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from api.biometrics import (
+    collect_profile_issues,
+    validate_age,
+    validate_bmi_from_metrics,
+    validate_height_cm,
+    validate_user_biometrics,
+    validate_weight_kg,
+)
 
 
 # =============================================================================
@@ -14,26 +24,109 @@ from pydantic import BaseModel, ConfigDict, Field
 # Source : Gym Members Exercise Dataset (Kaggle, CSV)
 # =============================================================================
 
-class UserCreate(BaseModel):
+class _UserBiometricInput(BaseModel):
+    """Champs biométriques en entrée — validation stricte (POST/PUT uniquement)."""
+
+    age: Optional[int] = Field(None, description="Âge en années (18–100 si renseigné)")
+    weight_kg: Optional[float] = Field(None, description="Poids en kg (20–300 si renseigné)")
+    height_cm: Optional[float] = Field(
+        None, description="Taille en cm (90–230 si renseignée)"
+    )
+
+    @field_validator("age")
+    @classmethod
+    def _check_age(cls, value: Optional[int]) -> Optional[int]:
+        err = validate_age(value)
+        if err:
+            raise ValueError(err)
+        return value
+
+    @field_validator("weight_kg")
+    @classmethod
+    def _check_weight(cls, value: Optional[float]) -> Optional[float]:
+        err = validate_weight_kg(value)
+        if err:
+            raise ValueError(err)
+        return value
+
+    @field_validator("height_cm")
+    @classmethod
+    def _check_height(cls, value: Optional[float]) -> Optional[float]:
+        err = validate_height_cm(value)
+        if err:
+            raise ValueError(err)
+        return value
+
+    @model_validator(mode="after")
+    def _validate_biometrics(self):
+        err = validate_bmi_from_metrics(self.weight_kg, self.height_cm)
+        if err:
+            raise ValueError(err)
+        bmi = getattr(self, "bmi", None)
+        if bmi is not None:
+            err = validate_user_biometrics(
+                age=self.age,
+                weight_kg=self.weight_kg,
+                height_cm=self.height_cm,
+                bmi=bmi,
+            )
+            if err:
+                raise ValueError(err)
+        return self
+
+
+class UserCreate(_UserBiometricInput):
     """Données requises pour créer ou mettre à jour un utilisateur (POST / PUT /users)."""
 
     name: str = Field(..., max_length=100)
-    age: Optional[int] = Field(None, ge=0, le=120)  # Null à l'inscription, complété ensuite
     gender: Optional[Literal["male", "female", "other"]] = None
-    weight_kg: Optional[float] = Field(None, gt=0)
-    height_cm: Optional[float] = Field(None, gt=0)
-    bmi: Optional[float] = Field(None, description="Calculé à l'ingestion par le pipeline ETL")
+    bmi: Optional[float] = Field(
+        None,
+        description="Ignoré à l'écriture : recalculé côté serveur à partir du poids et de la taille",
+    )
     body_fat_pct: Optional[float] = Field(None, ge=0, le=100)
     goal: Optional[Literal["weight_loss", "muscle_gain", "sleep_improvement", "maintenance"]] = None
 
 
-class UserResponse(UserCreate):
-    """Données renvoyées par l'API pour un utilisateur (GET /users, GET /users/{id})."""
+class ProfileUpdateRequest(_UserBiometricInput):
+    """Champs santé éditables par l'utilisateur connecté (PUT /auth/me/profile)."""
+
+    gender: Optional[Literal["male", "female", "other"]] = None
+    body_fat_pct: Optional[float] = Field(None, ge=0, le=100)
+    goal: Optional[Literal[
+        "weight_loss", "muscle_gain", "sleep_improvement", "maintenance"
+    ]] = None
+
+
+class UserResponse(BaseModel):
+    """Données renvoyées par l'API (GET). Accepte les valeurs legacy ; signale les anomalies."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    name: str = Field(..., max_length=100)
+    age: Optional[int] = None
+    gender: Optional[Literal["male", "female", "other"]] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    bmi: Optional[float] = None
+    body_fat_pct: Optional[float] = None
+    goal: Optional[Literal["weight_loss", "muscle_gain", "sleep_improvement", "maintenance"]] = None
     created_at: date
+    profile_issues: list[str] = Field(
+        default_factory=list,
+        description="Champs biométriques hors limites — à corriger via le formulaire profil",
+    )
+
+    @model_validator(mode="after")
+    def _attach_profile_issues(self):
+        self.profile_issues = collect_profile_issues(
+            age=self.age,
+            weight_kg=self.weight_kg,
+            height_cm=self.height_cm,
+            bmi=self.bmi,
+        )
+        return self
 
 
 # =============================================================================

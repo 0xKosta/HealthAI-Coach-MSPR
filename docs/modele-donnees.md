@@ -58,15 +58,16 @@ Notation : PK = cle primaire, FK = cle etrangere, * = obligatoire
 users(
     id*           INTEGER     PK auto-incremente,
     name*         VARCHAR(100),
-    age           INTEGER,
+    age           INTEGER,      -- nullable a l'inscription ; 18-100 si renseigne
     gender        VARCHAR(10),
-    weight_kg     FLOAT,
-    height_cm     FLOAT,
-    bmi           FLOAT,
+    weight_kg     FLOAT,        -- 20-300 kg si renseigne
+    height_cm     FLOAT,        -- 90-230 cm si renseigne
+    bmi           FLOAT,        -- 10-80 ; calcule serveur : poids / taille(m)^2
     body_fat_pct  FLOAT,
     goal          VARCHAR(50),
     created_at    DATE
 )
+-- Contraintes CHECK (init.sql + migration 004) — voir docs/validation-biometrique.md
 
 foods(
     id*                INTEGER  PK auto-incremente,
@@ -289,3 +290,22 @@ Le poids, le sommeil et la frequence cardiaque au repos sont des donnees **tempo
 ### Pourquoi `session_exercises` comme table de liaison ?
 
 La relation entre `workout_sessions` et `exercises` est **N-N** : une seance contient plusieurs exercices, et un exercice peut apparaitre dans plusieurs seances. Une table de liaison est la seule facon correcte de modeliser une relation N-N en relationnel, tout en portant les attributs specifiques a chaque occurrence (sets, reps, duree).
+
+---
+
+## 6. Validation biométrique du profil (API)
+
+Le profil `users` est soumis a des **regles metier** a l'ecriture (POST/PUT, `PUT /auth/me/profile`) :
+
+| Champ | Plage |
+|-------|--------|
+| age | 18 – 100 (null autorise tant que le profil n'est pas complete) |
+| height_cm | 90 – 230 |
+| weight_kg | 20 – 300 |
+| bmi | 10 – 80, recalcule automatiquement |
+
+En lecture (`GET /users/{id}`, `GET /auth/me/profile`), l'API renvoie les valeurs stockees et un champ **`profile_issues`** (liste de messages en francais) si des donnees legacy ou aberrantes sont presentes — sans erreur HTTP 500.
+
+Les endpoints **`/coach/*`** refusent les appels si le profil est incomplet ou invalide (HTTP 400).
+
+Documentation complete : [`validation-biometrique.md`](./validation-biometrique.md).

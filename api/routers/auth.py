@@ -4,7 +4,6 @@
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -15,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from api.database import get_db
 from api.models import User, UserAuth
-from api.schemas import UserResponse
+from api.biometrics import resolve_bmi, validate_user_biometrics
+from api.schemas import ProfileUpdateRequest, UserResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -311,31 +311,6 @@ def update_me(
 # Sécurisé : on ne touche QUE le profil lié au compte du token.
 # =============================================================================
 
-class ProfileUpdateRequest(BaseModel):
-    """Champs santé éditables par l'utilisateur. Bornes alignées sur les CHECK BDD."""
-
-    age: Optional[int] = Field(None, ge=0, le=120)
-    gender: Optional[Literal["male", "female", "other"]] = None
-    weight_kg: Optional[float] = Field(None, gt=0)
-    height_cm: Optional[float] = Field(None, gt=0)
-    body_fat_pct: Optional[float] = Field(None, ge=0, le=100)
-    goal: Optional[Literal[
-        "weight_loss", "muscle_gain", "sleep_improvement", "maintenance"
-    ]] = None
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "age": 30,
-                "gender": "female",
-                "weight_kg": 65.0,
-                "height_cm": 170.0,
-                "body_fat_pct": 22.0,
-                "goal": "maintenance",
-            }
-        }
-
-
 def _get_linked_profile(current_user: UserAuth, db: Session) -> User:
     """Retourne le profil users lié au compte connecté, ou lève une 404."""
     if not current_user.user_id:
@@ -379,12 +354,15 @@ def update_my_profile(
     for field, value in payload.model_dump().items():
         setattr(profile, field, value)
 
-    # IMC = poids(kg) / taille(m)² — recalculé serveur pour rester cohérent
-    if profile.weight_kg and profile.height_cm:
-        height_m = profile.height_cm / 100
-        profile.bmi = round(profile.weight_kg / (height_m * height_m), 2)
-    else:
-        profile.bmi = None
+    err = validate_user_biometrics(
+        age=profile.age,
+        weight_kg=profile.weight_kg,
+        height_cm=profile.height_cm,
+    )
+    if err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
+
+    profile.bmi = resolve_bmi(profile.weight_kg, profile.height_cm)
 
     db.commit()
     db.refresh(profile)

@@ -143,7 +143,23 @@ python db/seed_auth.py
 
 Vérification : `SELECT COUNT(*) FROM user_auth;` → 100
 
-### 7. Sauvegarde / restauration de la base
+### 7. Migrations profil santé (âge nullable + validation biométrique)
+
+Sur une base **déjà initialisée**, appliquer les migrations additives dans l'ordre :
+
+```bash
+psql -h <host> -U <user> -d <dbname> -f db/migrations/002_users_age_nullable.sql
+psql -h <host> -U <user> -d <dbname> -f db/migrations/004_users_biometric_checks.sql
+```
+
+| Migration | Effet |
+|-----------|--------|
+| `002_users_age_nullable.sql` | `users.age` nullable à l'inscription |
+| `004_users_biometric_checks.sql` | Contraintes CHECK âge, taille, poids, IMC |
+
+Documentation détaillée : [`docs/validation-biometrique.md`](docs/validation-biometrique.md).
+
+### 8. Sauvegarde / restauration de la base
 
 ```bash
 # Sauvegarde
@@ -217,6 +233,8 @@ uvicorn api.main:app --reload
 | `POST /coach/meal-plan` | GPT-4o-mini | Plan repas hebdomadaire avec budget et allergies |
 
 > Tous les endpoints `/coach/*` intègrent un **cache TTL** (1h), un **rate limiting** (10 appels/h/utilisateur) et un **fallback** si OpenAI est indisponible.
+>
+> **Prérequis profil :** âge, poids, taille et objectif renseignés, biométrie dans les plages autorisées — sinon réponse **400**. Voir [`docs/validation-biometrique.md`](docs/validation-biometrique.md).
 
 ### Authentification — JWT (MSPR 3)
 
@@ -224,7 +242,10 @@ uvicorn api.main:app --reload
 |----------|-------------|
 | `POST /auth/register` | Créer un compte (retourne un token JWT) |
 | `POST /auth/login` | Se connecter (email + mot de passe) |
-| `GET /auth/me` | Profil de l'utilisateur connecté 🔒 |
+| `GET /auth/me` | Profil du compte connecté 🔒 |
+| `GET /auth/me/profile` | Profil santé lié (`users`) + `profile_issues` 🔒 |
+| `PUT /auth/me/profile` | Mettre à jour le profil santé (validation biométrique) 🔒 |
+| `DELETE /auth/me` | Suppression du compte (RGPD) 🔒 |
 
 ### Feed Social (MSPR 3)
 
@@ -278,7 +299,7 @@ Rapport HTML : ouvrir `htmlcov/index.html` dans le navigateur.
 
 > Si `pytest-cov` n'est pas installé : `pip install pytest-cov`
 
-**Couverture actuelle : 73%** (22 tests)
+**Couverture indicative : ~73%** — lancer `pytest tests/ -v` pour l'état actuel (biométrie : `tests/test_biometrics.py`).
 
 | Fichier | Couverture |
 |---------|-----------|
@@ -307,10 +328,11 @@ Le fichier `docs/openapi.json` est versionné dans le dépôt.
 
 ```
 api/
-├── main.py              # Point d'entrée FastAPI + CORS + routers
+├── main.py              # Point d'entrée FastAPI + CORS + routers + handler 400 biométrie
 ├── database.py          # Connexion SQLAlchemy 2 + générateur get_db()
 ├── models.py            # 9 modèles ORM — syntaxe Mapped[] (SQLAlchemy 2)
-├── schemas.py           # Schémas Pydantic v2
+├── schemas.py           # Schémas Pydantic v2 (input strict / response + profile_issues)
+├── biometrics.py        # Règles métier âge, taille, poids, IMC
 ├── ai_client.py         # Client OpenAI centralisé
 ├── coach_utils.py       # Cache TTL, rate limiter, fallbacks IA
 └── routers/
@@ -326,6 +348,7 @@ front-end/
 ├── src/
 │   ├── views/           # Vues (Dashboard, Nutrition, Workout, Trends, Feed, Login...)
 │   ├── components/      # Composants UI réutilisables
+│   ├── composables/     # useBiometricValidation, useProfileCompletion…
 │   ├── services/        # api.js — appels HTTP
 │   └── stores/          # Pinia — état global (userStore, authStore)
 └── vite.config.js
@@ -343,7 +366,9 @@ db/
 ├── queries.sql          # Requêtes analytiques
 ├── seed_auth.py         # 100 comptes démo user_auth (MSPR 3)
 └── migrations/
-    └── 001_user_auth_posts.sql   # Tables user_auth + posts (MSPR 3)
+    ├── 001_user_auth_posts.sql
+    ├── 002_users_age_nullable.sql
+    └── 004_users_biometric_checks.sql
 
 scripts/
 ├── backup_db.py         # Sauvegarde / restauration PostgreSQL
@@ -352,13 +377,16 @@ scripts/
 docs/
 ├── openapi.json         # Schéma OpenAPI exporté
 ├── sources.md           # Inventaire des sources de données
-└── modele-donnees.md    # Documentation du schéma relationnel
+├── modele-donnees.md    # Documentation du schéma relationnel
+└── validation-biometrique.md  # Règles profil + IA + migrations
 
 media/posts/             # Médias uploadés (non versionnés — dans .gitignore)
 backups/                 # Dumps PostgreSQL (non versionnés — dans .gitignore)
 
 tests/
-└── test_routes.py       # 22 tests d'intégration (pytest + SQLite + mock OpenAI)
+├── conftest.py          # Fixtures pytest partagées
+├── test_routes.py       # Tests d'intégration API
+└── test_biometrics.py   # Validation biométrique
 
 export_openapi.py        # Script export openapi.json
 env.example              # Template .env

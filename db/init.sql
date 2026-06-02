@@ -33,11 +33,11 @@ DROP TABLE IF EXISTS users               CASCADE;
 CREATE TABLE users (
     id              SERIAL PRIMARY KEY,
     name            VARCHAR(100)    NOT NULL,
-    age             INT             NOT NULL CHECK (age >= 0 AND age <= 120),
+    age             INT             CHECK (age IS NULL OR (age >= 18 AND age <= 100)),
     gender          VARCHAR(10)     CHECK (gender IN ('male', 'female', 'other')),
-    weight_kg       FLOAT           CHECK (weight_kg > 0),
-    height_cm       FLOAT           CHECK (height_cm > 0),
-    bmi             FLOAT,
+    weight_kg       FLOAT           CHECK (weight_kg IS NULL OR (weight_kg >= 20 AND weight_kg <= 300)),
+    height_cm       FLOAT           CHECK (height_cm IS NULL OR (height_cm >= 90 AND height_cm <= 230)),
+    bmi             FLOAT           CHECK (bmi IS NULL OR (bmi >= 10 AND bmi <= 80)),
     body_fat_pct    FLOAT           CHECK (body_fat_pct >= 0 AND body_fat_pct <= 100),
     goal            VARCHAR(50)     CHECK (goal IN (
                                         'weight_loss',

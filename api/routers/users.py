@@ -5,6 +5,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from api.biometrics import resolve_bmi, validate_user_biometrics
 from api.database import get_db
 from api.models import User
 from api.schemas import UserCreate, UserResponse
@@ -50,15 +51,31 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     return user
 
 
+def _apply_user_payload(user: User, payload: UserCreate) -> None:
+    data = payload.model_dump(exclude={"bmi"})
+    err = validate_user_biometrics(
+        age=data.get("age"),
+        weight_kg=data.get("weight_kg"),
+        height_cm=data.get("height_cm"),
+    )
+    if err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err)
+
+    for field, value in data.items():
+        setattr(user, field, value)
+    user.bmi = resolve_bmi(user.weight_kg, user.height_cm)
+
+
 @router.post(
     "/",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Créer un utilisateur",
-    description="Crée un nouveau profil utilisateur. Le champ `bmi` peut être pré-calculé par l'ETL.",
+    description="Crée un nouveau profil utilisateur. L'IMC est recalculé automatiquement côté serveur.",
 )
 def create_user(payload: UserCreate, db: Session = Depends(get_db)):
-    user = User(**payload.model_dump())
+    user = User(name=payload.name)
+    _apply_user_payload(user, payload)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -75,8 +92,7 @@ def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
-    for field, value in payload.model_dump().items():
-        setattr(user, field, value)
+    _apply_user_payload(user, payload)
     db.commit()
     db.refresh(user)
     return user

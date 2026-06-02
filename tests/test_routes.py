@@ -2,68 +2,6 @@
 import json
 import pytest
 from unittest.mock import MagicMock, patch
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from api.database import Base, get_db
-from api.main import app
-
-# =============================================================================
-# Config — SQLite en mémoire
-# =============================================================================
-
-engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# =============================================================================
-# Fixtures
-# =============================================================================
-
-@pytest.fixture(scope="session", autouse=True)
-def create_tables():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture(scope="session")
-def client(create_tables):
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture(scope="session")
-def created_user(client):
-    """Utilisateur créé une fois, réutilisé dans tous les tests qui en ont besoin."""
-    payload = {
-        "name": "Alice Martin",
-        "age": 30,
-        "gender": "female",
-        "weight_kg": 65.0,
-        "height_cm": 170.0,
-        "goal": "weight_loss",
-    }
-    response = client.post("/users/", json=payload)
-    assert response.status_code == 201
-    return response.json()
-
 
 # =============================================================================
 # /health
@@ -91,9 +29,10 @@ def test_create_user_valid_returns_201(client, created_user):
     assert "id" in created_user
 
 
-def test_create_user_negative_age_returns_422(client):
-    response = client.post("/users/", json={"name": "Bob", "age": -5})
-    assert response.status_code == 422
+def test_create_user_invalid_age_returns_400(client):
+    response = client.post("/users/", json={"name": "Bob", "age": 17})
+    assert response.status_code == 400
+    assert "âge" in response.json()["detail"].lower()
 
 
 def test_get_user_not_found_returns_404(client):

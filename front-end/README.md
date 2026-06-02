@@ -109,8 +109,13 @@ front-end/
 │   │       ├── AIAdviceCard.vue # Carte réponse IA (fond bleu nuit)
 │   │       ├── ErrorAlert.vue   # Alerte d'erreur
 │   │       ├── LoadingSpinner.vue
+│   │       ├── ProfileAiGate.vue      # Blocage IA (profil incomplet / invalide)
+│   │       ├── ProfileDataWarning.vue # Bandeau correction profil
 │   │       ├── StatCard.vue     # Carte indicateur chiffré
 │   │       └── UserSelector.vue # Dropdown sélection utilisateur
+│   ├── composables/
+│   │   ├── useBiometricValidation.js  # Bornes + validation formulaire profil
+│   │   └── useProfileCompletion.js    # blocksAiFeatures, profile_issues…
 │   ├── router/
 │   │   └── index.js             # Déclaration des routes
 │   ├── services/
@@ -136,32 +141,30 @@ front-end/
 
 ## Pages
 
-### `/` — Dashboard
-- Sélecteur d'utilisateur global (persistant sur toutes les pages)
+### `/dashboard/:userId` — Dashboard
 - Carte profil : âge, IMC, poids, taille, masse grasse
-- Indicateurs rapides : score santé, objectif, catégorie IMC
-- Bouton **"Obtenir un conseil IA"** → appelle `POST /coach/advice`
+- **Profil incomplet ou invalide** : bandeau d'accueil / correction avec liste des erreurs, stats et IA verrouillés
+- Indicateurs rapides et conseil IA disponibles uniquement si `blocksAiFeatures(user)` est faux
+- Bouton **« Obtenir un conseil IA »** → `POST /coach/advice` (refusé côté API si profil non conforme)
 
-### `/nutrition` — Analyse nutritionnelle
-- Upload d'image par clic ou **drag & drop**
-- Envoi en base64 → `POST /coach/analyze-photo`
-- Affichage des aliments détectés + macros (calories, protéines, glucides, lipides)
-- Conseil nutritionnel IA
+### `/dashboard/:userId/nutrition` — Analyse nutritionnelle
+- `ProfileAiGate` si profil incomplet ou biométrie hors limites
+- Upload d'image → `POST /coach/analyze-photo`
 
-### `/workout` — Programme d'entraînement
-- Sélection de l'équipement disponible (6 options avec icônes Material)
-- Sélection du nombre de jours par semaine (1 à 7)
+### `/dashboard/:userId/workout` — Programme d'entraînement
+- `ProfileAiGate` si profil non prêt pour l'IA
 - Génération via `POST /coach/workout-plan`
-- Affichage du programme formaté
+
+### `/dashboard/:userId/profile` — Édition profil santé
+- Validation temps réel (âge 18–100, taille 90–230 cm, poids 20–300 kg, IMC 10–80)
+- Erreurs par champ + blocage à l'envoi ; affichage des `profile_issues` retournés par l'API
 
 ### `/exercises` — Catalogue d'exercices
 - Consultation du catalogue complet via `GET /exercises`
 
-### `/trends` — Tendances biométriques
-- KPIs : poids actuel, sommeil moyen, BPM repos, nombre d'entrées
-- Graphique courbe de poids (30 jours)
-- Graphique sommeil + BPM repos
-- Analyse des tendances via `POST /coach/biometric-trend`
+### `/dashboard/:userId/trends` — Tendances biométriques
+- KPIs et graphiques (30 jours) — données `GET /metrics/`
+- Analyse IA verrouillée si profil incomplet/invalide ; sinon `POST /coach/biometric-trend` après 7 jours de données
 
 ---
 
@@ -189,14 +192,16 @@ Typographie : **Inter** (400 / 600 / 700) — chargée via Google Fonts.
 
 | Méthode | Endpoint | Page |
 |---|---|---|
-| `GET` | `/users/` | Toutes (sélecteur) |
-| `GET` | `/users/{id}` | Dashboard |
+| `GET` | `/users/{id}` | Dashboard, Nutrition, Workout, Trends (`profile_issues`) |
+| `GET` / `PUT` | `/auth/me/profile` | ProfileEditView |
 | `GET` | `/metrics/` | Trends |
 | `GET` | `/exercises/` | Exercises |
-| `POST` | `/coach/advice` | Dashboard |
+| `POST` | `/coach/advice` | Dashboard (profil valide requis) |
 | `POST` | `/coach/analyze-photo` | Nutrition |
 | `POST` | `/coach/workout-plan` | Workout |
 | `POST` | `/coach/biometric-trend` | Trends |
+
+Règles biométriques et verrouillage IA : [`../docs/validation-biometrique.md`](../docs/validation-biometrique.md).
 
 > Le CORS est configuré côté backend pour accepter `http://localhost:3000` et `http://localhost:4173` (preview).
 

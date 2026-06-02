@@ -13,6 +13,15 @@
 
     <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
 
+    <ProfileAiGate
+      v-if="currentUser && profileBlocksAi"
+      title="Analyse des tendances verrouillée"
+      :description="profileGateDescription"
+      :issues="profileIssues"
+      :profile-edit-path="profileEditPath"
+      :cta-label="hasInvalidProfile ? 'Corriger le profil' : 'Compléter mon profil'"
+    />
+
     <LoadingSpinner v-if="metricsLoading" message="Chargement des métriques..." />
     <ErrorAlert v-if="metricsError" :message="metricsError" />
 
@@ -61,11 +70,11 @@
       </div>
 
       <!-- Analyse IA -->
-      <div class="card" :class="{ 'opacity-90': !canAnalyzeTrends }">
+      <div class="card" :class="{ 'opacity-90': !canRunTrendAi }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div class="flex items-start gap-3">
             <div
-              v-if="!canAnalyzeTrends"
+              v-if="!canRunTrendAi"
               class="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"
             >
               <span class="material-symbols-outlined text-[22px] text-slate-500">lock</span>
@@ -73,14 +82,25 @@
             <div>
               <h2 class="text-xl font-bold text-brand-primary">Analyse des tendances</h2>
               <p class="text-sm text-slate-600 mt-0.5">
-                {{ canAnalyzeTrends
-                  ? "Interprétation IA de l'évolution sur 30 jours"
-                  : `Disponible après ${MIN_TREND_ANALYSIS_DAYS} jours de données synchronisées` }}
+                {{ trendAiLockHint }}
               </p>
+              <ul
+                v-if="profileBlocksAi && profileIssues.length"
+                class="mt-2 text-sm text-amber-900/90 list-disc list-inside"
+              >
+                <li v-for="(issue, index) in profileIssues" :key="index">{{ issue }}</li>
+              </ul>
             </div>
           </div>
+          <RouterLink
+            v-if="profileBlocksAi && profileEditPath"
+            :to="profileEditPath"
+            class="btn-primary shrink-0 justify-center"
+          >
+            {{ hasInvalidProfile ? 'Corriger le profil' : 'Compléter mon profil' }}
+          </RouterLink>
           <button
-            v-if="canAnalyzeTrends"
+            v-else-if="canRunTrendAi"
             @click="fetchTrendAnalysis"
             :disabled="trendLoading"
             class="btn-primary shrink-0"
@@ -93,7 +113,7 @@
           </button>
         </div>
 
-        <div v-if="!canAnalyzeTrends" class="mb-6">
+        <div v-if="!profileBlocksAi && !canAnalyzeTrends" class="mb-6">
           <div class="flex justify-between text-sm mb-2">
             <span class="font-medium text-brand-primary">Jours de données collectés</span>
             <span class="text-slate-600">{{ distinctMetricDays }}/{{ MIN_TREND_ANALYSIS_DAYS }}</span>
@@ -111,7 +131,7 @@
           </p>
         </div>
 
-        <template v-if="canAnalyzeTrends">
+        <template v-if="canRunTrendAi">
           <ErrorAlert v-if="trendError" :message="trendError" />
 
           <div v-if="!trendAnalysis && !trendLoading && !trendError"
@@ -178,12 +198,21 @@ import {
   countDistinctMetricDays,
   canUnlockTrendAnalysis,
 } from '@/composables/useBiometricTrends'
-import { metricsAPI, coachAPI } from '@/services/api'
+import {
+  blocksAiFeatures,
+  getProfileEditPath,
+  getProfileIssues,
+  hasInvalidProfileData,
+  PROFILE_AI_REQUIRED_MSG,
+  PROFILE_INVALID_MSG,
+} from '@/composables/useProfileCompletion'
+import { metricsAPI, coachAPI, usersAPI } from '@/services/api'
 import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 
 const userStore = useUserStore()
 const { isAdminScope } = useDashboardScope()
@@ -196,7 +225,16 @@ const trendAnalysis = ref('')
 const trendLoading = ref(false)
 const trendError = ref('')
 const activeUserId = ref(null)
+const currentUser = ref(null)
 const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
+
+const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
+const profileBlocksAi = computed(() => blocksAiFeatures(currentUser.value))
+const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
+const profileIssues = computed(() => getProfileIssues(currentUser.value))
+const profileGateDescription = computed(() =>
+  hasInvalidProfile.value ? PROFILE_INVALID_MSG : PROFILE_AI_REQUIRED_MSG
+)
 const userMetrics = computed(() =>
   allMetrics.value
     .slice()
@@ -206,6 +244,14 @@ const userMetrics = computed(() =>
 
 const distinctMetricDays = computed(() => countDistinctMetricDays(userMetrics.value))
 const canAnalyzeTrends = computed(() => canUnlockTrendAnalysis(userMetrics.value))
+const canRunTrendAi = computed(() => canAnalyzeTrends.value && !profileBlocksAi.value)
+const trendAiLockHint = computed(() => {
+  if (profileBlocksAi.value) return profileGateDescription.value
+  if (!canAnalyzeTrends.value) {
+    return `Disponible après ${MIN_TREND_ANALYSIS_DAYS} jours de données synchronisées`
+  }
+  return "Interprétation IA de l'évolution sur 30 jours"
+})
 const trendDaysRemaining = computed(() =>
   Math.max(0, MIN_TREND_ANALYSIS_DAYS - distinctMetricDays.value)
 )
@@ -280,16 +326,30 @@ const sleepBpmSeries = computed(() => [
   { name: 'BPM repos',   data: userMetrics.value.map(m => m.resting_bpm ?? null) },
 ])
 
+async function loadUserProfile() {
+  if (!activeUserId.value) return
+  try {
+    const res = await usersAPI.getById(activeUserId.value)
+    currentUser.value = res.data
+    userStore.selectUser(activeUserId.value)
+  } catch {
+    currentUser.value = null
+  }
+}
+
 async function loadMetrics() {
   if (!activeUserId.value) return
   metricsLoading.value = true; metricsError.value = ''
-  try { const res = await metricsAPI.getByUser(activeUserId.value); allMetrics.value = res.data }
-  catch { metricsError.value = 'Impossible de charger les métriques biométriques.' }
+  try {
+    await loadUserProfile()
+    const res = await metricsAPI.getByUser(activeUserId.value)
+    allMetrics.value = res.data
+  } catch { metricsError.value = 'Impossible de charger les métriques biométriques.' }
   finally { metricsLoading.value = false }
 }
 
 async function fetchTrendAnalysis() {
-  if (!activeUserId.value || !canAnalyzeTrends.value) return
+  if (!activeUserId.value || !canRunTrendAi.value) return
   trendLoading.value = true; trendError.value = ''; trendAnalysis.value = ''
   try {
     const res = await coachAPI.getBiometricTrend(activeUserId.value)
@@ -315,7 +375,7 @@ function goToUsersList() {
   router.push(isAdminScope.value ? '/admin' : '/')
 }
 
-watch(canAnalyzeTrends, (ok) => {
+watch(canRunTrendAi, (ok) => {
   if (!ok) resetTrendState()
 })
 
