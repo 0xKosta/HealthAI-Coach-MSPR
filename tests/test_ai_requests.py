@@ -90,13 +90,34 @@ def test_list_ai_requests_requires_auth(client, history_user_id):
     assert response.status_code == 401
 
 
-def test_list_ai_requests_forbidden_for_user(
-    client, history_user_id, history_premium_headers
+@pytest.fixture
+def history_free_headers(history_user_id):
+    suffix = uuid.uuid4().hex[:8]
+    db = TestingSessionLocal()
+    account = UserAuth(
+        user_id=history_user_id,
+        email=f"free.hist.{suffix}@test.local",
+        password_hash=hash_password("testpass"),
+        first_name="Free",
+        last_name="Hist",
+        role="user",
+        plan="free",
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    token = create_token(account.id)
+    db.close()
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_list_ai_requests_forbidden_for_free_plan(
+    client, history_user_id, history_free_headers
 ):
     _seed_advice_row(history_user_id)
     response = client.get(
         f"/ai-requests/?user_id={history_user_id}",
-        headers=history_premium_headers,
+        headers=history_free_headers,
     )
     assert response.status_code == 403
 
@@ -126,3 +147,27 @@ def test_list_ai_requests_filter_type(client, history_user_id, history_admin_hea
     )
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_premium_user_can_list_own_history(client, history_user_id, history_premium_headers):
+    _seed_advice_row(history_user_id)
+    response = client.get(
+        f"/ai-requests/?user_id={history_user_id}&request_type=advice",
+        headers=history_premium_headers,
+    )
+    assert response.status_code == 200
+    assert len(response.json()) >= 1
+    assert response.headers.get("X-History-Days") == "7"
+    assert response.headers.get("X-History-Limit") == "20"
+    assert int(response.headers.get("X-History-Count", 0)) >= 1
+
+
+def test_premium_user_cannot_list_other_user_history(
+    client, history_user_id, history_premium_headers
+):
+    other = history_user_id + 9999
+    response = client.get(
+        f"/ai-requests/?user_id={other}",
+        headers=history_premium_headers,
+    )
+    assert response.status_code == 403

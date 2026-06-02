@@ -262,6 +262,7 @@
 
       <AiRequestHistoryPanel
         v-if="isAdminScope && activeUserId"
+        variant="admin"
         :user-id="activeUserId"
         request-type="advice"
         title="Historique des conseils IA"
@@ -269,7 +270,7 @@
       />
 
       <!-- Conseil IA (espace utilisateur) -->
-      <div v-else class="card" :class="{ 'opacity-75': aiBlocked }">
+      <div v-if="!isAdminScope" class="card" :class="{ 'opacity-75': aiBlocked }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div class="flex items-start gap-3">
             <div
@@ -340,6 +341,16 @@
           </p>
         </div>
       </div>
+
+      <AiRequestHistoryPanel
+        v-if="!isAdminScope && activeUserId && auth.canUseAi"
+        ref="adviceHistoryRef"
+        variant="user"
+        :plan="auth.plan"
+        :user-id="activeUserId"
+        request-type="advice"
+        title="Historique"
+      />
     </template>
   </div>
 </template>
@@ -458,6 +469,7 @@ const profileCompletionPercent = computed(() => {
 })
 
 const advice = ref('')
+const adviceHistoryRef = ref(null)
 const adviceLoading = ref(false)
 const adviceError = ref('')
 
@@ -587,6 +599,7 @@ async function fetchAdvice() {
   try {
     const res = await coachAPI.getAdvice(user.value.id)
     advice.value = res.data.advice
+    adviceHistoryRef.value?.reload()
   } catch (e) {
     const detail = parseApiErrorDetail(e.response?.data?.detail)
     adviceError.value =

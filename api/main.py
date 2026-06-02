@@ -30,7 +30,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Total-Count"],
+    expose_headers=[
+        "X-Total-Count",
+        "X-History-Count",
+        "X-History-Limit",
+        "X-History-Days",
+        "X-History-Since",
+    ],
 )
 
 app.include_router(users.router,     prefix="/users",     tags=["Utilisateurs"])

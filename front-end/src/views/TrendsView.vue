@@ -77,6 +77,7 @@
 
       <AiRequestHistoryPanel
         v-if="isAdminScope && activeUserId"
+        variant="admin"
         :user-id="activeUserId"
         request-type="biometric_trend"
         title="Historique des analyses IA (tendances)"
@@ -84,7 +85,7 @@
       />
 
       <!-- Analyse IA (espace utilisateur) -->
-      <div v-else class="card" :class="{ 'opacity-90': !canRunTrendAi }">
+      <div v-if="!isAdminScope" class="card" :class="{ 'opacity-90': !canRunTrendAi }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div class="flex items-start gap-3">
             <div
@@ -171,6 +172,16 @@
           </p>
         </div>
       </div>
+
+      <AiRequestHistoryPanel
+        v-if="!isAdminScope && activeUserId && auth.canUseAi"
+        ref="trendHistoryRef"
+        variant="user"
+        :plan="auth.plan"
+        :user-id="activeUserId"
+        request-type="biometric_trend"
+        title="Historique"
+      />
     </template>
 
     <!-- État vide -->
@@ -201,6 +212,7 @@
 
     <AiRequestHistoryPanel
       v-if="isAdminScope && activeUserId && !metricsLoading && !userMetrics.length"
+      variant="admin"
       :user-id="activeUserId"
       request-type="biometric_trend"
       title="Historique des analyses IA (tendances)"
@@ -213,6 +225,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
 import {
@@ -236,6 +249,8 @@ import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 
 const userStore = useUserStore()
+const auth = useAuthStore()
+const trendHistoryRef = ref(null)
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -376,6 +391,7 @@ async function fetchTrendAnalysis() {
   try {
     const res = await coachAPI.getBiometricTrend(activeUserId.value)
     trendAnalysis.value = res.data.analysis
+    trendHistoryRef.value?.reload()
   } catch {
     trendError.value = "Erreur lors de l'analyse. Vérifiez la connexion à l'API."
   } finally {

@@ -28,6 +28,7 @@
 
     <AiRequestHistoryPanel
       v-if="isAdminScope && activeUserId && !userLoading && !userError"
+      variant="admin"
       :user-id="activeUserId"
       request-type="analyze_photo"
       title="Historique nutrition (photos IA)"
@@ -131,6 +132,16 @@
       <!-- Analyse IA — fond bleu nuit -->
       <AIAdviceCard v-if="result.advice" title="Analyse nutritionnelle IA" :content="result.advice" />
     </template>
+
+    <AiRequestHistoryPanel
+      v-if="activeUserId && auth.canUseAi"
+      ref="photoHistoryRef"
+      variant="user"
+      :plan="auth.plan"
+      :user-id="activeUserId"
+      request-type="analyze_photo"
+      title="Historique"
+    />
     </template>
   </div>
 </template>
@@ -139,6 +150,7 @@
 import { ref, computed, defineComponent, h, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
 import {
@@ -157,6 +169,8 @@ import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 
 const userStore = useUserStore()
+const auth = useAuthStore()
+const photoHistoryRef = ref(null)
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -272,6 +286,7 @@ async function analyzePhoto() {
   try {
     const res = await coachAPI.analyzePhoto(activeUserId.value, imageBase64.value)
     result.value = res.data
+    photoHistoryRef.value?.reload()
   } catch (e) {
     const detail = parseApiErrorDetail(e.response?.data?.detail)
     const status = e.response?.status

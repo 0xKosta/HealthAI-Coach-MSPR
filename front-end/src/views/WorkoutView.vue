@@ -29,6 +29,7 @@
 
     <AiRequestHistoryPanel
       v-if="isAdminScope && activeUserId && !userLoading && !userError"
+      variant="admin"
       :user-id="activeUserId"
       request-type="workout_plan"
       title="Historique entraînement (plans IA)"
@@ -116,6 +117,16 @@
       </div>
       <AIAdviceCard title="Programme d'entraînement IA" :content="plan.plan" />
     </div>
+
+    <AiRequestHistoryPanel
+      v-if="activeUserId && auth.canUseAi"
+      ref="workoutHistoryRef"
+      variant="user"
+      :plan="auth.plan"
+      :user-id="activeUserId"
+      request-type="workout_plan"
+      title="Historique"
+    />
     </template>
 
   </div>
@@ -125,6 +136,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useViewNav } from '@/composables/useViewNav'
 import { useDisplayName } from '@/composables/useDisplayName'
@@ -144,6 +156,8 @@ import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 
 const userStore = useUserStore()
+const auth = useAuthStore()
+const workoutHistoryRef = ref(null)
 const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
@@ -195,6 +209,7 @@ async function generatePlan() {
   try {
     const res = await coachAPI.getWorkoutPlan(activeUserId.value, form.value.equipment, form.value.daysPerWeek)
     plan.value = res.data
+    workoutHistoryRef.value?.reload()
   } catch {
     planError.value = "Erreur lors de la génération du programme. Vérifiez la connexion à l'API."
   } finally {

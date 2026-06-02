@@ -1,15 +1,50 @@
 <template>
   <div class="card">
-    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
       <div>
-        <p class="text-xs font-semibold uppercase tracking-wide text-brand-accent">Supervision admin</p>
-        <h2 class="text-xl font-bold text-brand-primary mt-0.5">{{ title }}</h2>
-        <p v-if="description" class="text-sm text-slate-600 mt-1">{{ description }}</p>
+        <p
+          v-if="variant === 'admin'"
+          class="text-xs font-semibold uppercase tracking-wide text-brand-accent"
+        >
+          Supervision admin
+        </p>
+        <h2 class="text-xl font-bold text-brand-primary" :class="variant === 'admin' ? 'mt-0.5' : ''">
+          {{ title }}
+        </h2>
+        <p v-if="description && variant === 'admin'" class="text-sm text-slate-600 mt-1">
+          {{ description }}
+        </p>
       </div>
-      <p v-if="!loading && !error" class="text-sm text-slate-500 shrink-0">
-        {{ total }} entrée{{ total > 1 ? 's' : '' }}
-      </p>
+      <div v-if="!loading && !error" class="flex flex-col items-end gap-1 shrink-0 text-right">
+        <div
+          v-if="showQuota"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold tabular-nums"
+          :class="quotaAtCap
+            ? 'bg-amber-50 border-amber-200 text-amber-900'
+            : 'bg-brand-accent/10 border-brand-accent/25 text-brand-primary'"
+          :title="variant === 'user' ? quotaTitle : ''"
+        >
+          {{ countInWindow }}/{{ effectiveLimitMax }}
+        </div>
+        <p v-else-if="unlimited" class="text-sm text-slate-500">
+          {{ countInWindow }} entrée{{ countInWindow > 1 ? 's' : '' }}
+        </p>
+      </div>
     </div>
+
+    <p
+      v-if="variant === 'admin' && windowLabel"
+      class="text-xs text-slate-500 mb-4 -mt-2"
+    >
+      {{ windowLabel }}
+    </p>
+
+    <p
+      v-else-if="variant === 'user' && quotaAtCap"
+      class="text-xs text-amber-800 mb-4 -mt-2"
+    >
+      {{ quotaCapMessage }}
+    </p>
 
     <LoadingSpinner v-if="loading" message="Chargement de l'historique..." />
     <ErrorAlert v-else-if="error" :message="error" />
@@ -19,9 +54,13 @@
       class="flex flex-col items-center justify-center py-12 text-center rounded-xl bg-slate-50 border border-slate-100"
     >
       <span class="material-symbols-outlined text-[40px] text-slate-300 mb-3">history</span>
-      <p class="text-sm font-medium text-brand-primary">Aucune requête enregistrée</p>
+      <p class="text-sm font-medium text-brand-primary">
+        {{ variant === 'admin' ? 'Aucune requête enregistrée' : 'Aucune analyse enregistrée' }}
+      </p>
       <p class="text-xs text-slate-500 mt-1 max-w-sm">
-        Les appels IA de cet utilisateur apparaîtront ici après utilisation de la vue utilisateur.
+        {{ variant === 'admin'
+          ? 'Les appels IA de cet utilisateur apparaîtront ici après utilisation de la vue utilisateur.'
+          : 'Rien pour le moment.' }}
       </p>
     </div>
 
@@ -48,7 +87,7 @@
                 {{ formatAiRequestDate(row.created_at) }}
               </span>
               <span
-                v-if="row.from_cache"
+                v-if="variant === 'admin' && row.from_cache"
                 class="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"
               >
                 Cache
@@ -150,10 +189,12 @@
 </template>
 
 <script setup>
-import { ref, toRef } from 'vue'
+import { ref, toRef, computed } from 'vue'
 import { API_BASE_URL } from '@/services/api'
 import {
   formatAiRequestDate,
+  formatHistoryWindowLabel,
+  PLAN_HISTORY_QUOTA,
   resolveResponseText,
   useAiRequestHistory,
 } from '@/composables/useAiRequestHistory'
@@ -165,12 +206,75 @@ const props = defineProps({
   requestType: { type: String, default: '' },
   title: { type: String, required: true },
   description: { type: String, default: '' },
+  variant: { type: String, default: 'admin' },
+  plan: { type: String, default: 'free' },
+  enabled: { type: Boolean, default: true },
 })
 
 const expandedId = ref(null)
 const userIdRef = toRef(props, 'userId')
 const requestTypeRef = toRef(props, 'requestType')
-const { items, loading, error, total } = useAiRequestHistory(userIdRef, requestTypeRef)
+const enabledRef = toRef(props, 'enabled')
+const planRef = toRef(props, 'plan')
+const variantRef = toRef(props, 'variant')
+const {
+  items,
+  loading,
+  error,
+  countInWindow,
+  limitMax,
+  windowDays,
+  windowSince,
+  unlimited,
+  reload,
+} = useAiRequestHistory(userIdRef, requestTypeRef, {
+  enabledRef,
+  planRef,
+  variantRef,
+})
+
+defineExpose({ reload })
+
+const planQuotaFallback = computed(() => PLAN_HISTORY_QUOTA[props.plan] || null)
+
+const showQuota = computed(() => {
+  if (props.variant !== 'user') return false
+  if (limitMax.value > 0 && windowDays.value > 0) return true
+  return !!planQuotaFallback.value
+})
+const effectiveLimitMax = computed(() =>
+  limitMax.value > 0 ? limitMax.value : planQuotaFallback.value?.limitMax ?? 0
+)
+const effectiveWindowDays = computed(() =>
+  windowDays.value > 0 ? windowDays.value : planQuotaFallback.value?.windowDays ?? 0
+)
+const quotaAtCap = computed(
+  () => showQuota.value && effectiveLimitMax.value > 0
+    && countInWindow.value >= effectiveLimitMax.value
+)
+const windowLabel = computed(() => {
+  if (windowSince.value && effectiveWindowDays.value) {
+    return formatHistoryWindowLabel(windowSince.value, effectiveWindowDays.value)
+  }
+  if (effectiveWindowDays.value) {
+    return `Fenêtre glissante : ${effectiveWindowDays.value} jour${effectiveWindowDays.value > 1 ? 's' : ''}`
+  }
+  return ''
+})
+
+const quotaTitle = computed(() => {
+  const max = effectiveLimitMax.value
+  const days = effectiveWindowDays.value
+  if (!max) return ''
+  return `Jusqu'à ${max} analyses enregistrées sur les ${days} derniers jours`
+})
+
+const quotaCapMessage = computed(() => {
+  if (props.plan === 'premium') {
+    return 'Limite atteinte. Passez à Premium+ pour conserver plus d’historique (50 analyses / 30 jours).'
+  }
+  return 'Limite atteinte sur la période incluse dans votre offre.'
+})
 
 function toggle(id) {
   expandedId.value = expandedId.value === id ? null : id
