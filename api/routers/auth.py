@@ -77,6 +77,15 @@ def get_current_user(
     return user
 
 
+def require_admin(current_user: UserAuth = Depends(get_current_user)) -> UserAuth:
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé aux administrateurs.",
+        )
+    return current_user
+
+
 # =============================================================================
 # SCHÉMAS
 # =============================================================================
@@ -314,7 +323,8 @@ def update_me(
 
 # =============================================================================
 # PROFIL SANTÉ DE L'UTILISATEUR CONNECTÉ (table users liée)
-# Sécurisé : on ne touche QUE le profil lié au compte du token.
+# Parcours « mon profil » : lecture/écriture uniquement sur le profil lié au token.
+# Les admins qui gèrent un autre utilisateur passent par PUT /users/{id} (router users).
 # =============================================================================
 
 def _get_linked_profile(current_user: UserAuth, db: Session) -> User:

@@ -153,7 +153,7 @@
       <!-- Vue liste -->
       <div v-else-if="users.length && viewMode === 'list'" class="card overflow-hidden p-0">
         <div
-          class="hidden lg:grid lg:grid-cols-[2.5rem_minmax(0,1.4fr)_5.5rem_minmax(0,1fr)_7rem_5.5rem_1.25rem] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide"
+          class="hidden lg:grid lg:grid-cols-[2.5rem_minmax(0,1.4fr)_5.5rem_minmax(0,1fr)_7rem_5.5rem_2.5rem_1.25rem] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide"
         >
           <span aria-hidden="true"></span>
           <span>Nom</span>
@@ -161,6 +161,7 @@
           <span>Objectif</span>
           <span>Plan</span>
           <span>Créé le</span>
+          <span class="text-center">Modifier</span>
           <span aria-hidden="true"></span>
         </div>
 
@@ -173,7 +174,7 @@
         >
           <!-- Desktop -->
           <div
-            class="hidden lg:grid lg:grid-cols-[2.5rem_minmax(0,1.4fr)_5.5rem_minmax(0,1fr)_7rem_5.5rem_1.25rem] gap-3 items-center px-4 py-3"
+            class="hidden lg:grid lg:grid-cols-[2.5rem_minmax(0,1.4fr)_5.5rem_minmax(0,1fr)_7rem_5.5rem_2.5rem_1.25rem] gap-3 items-center px-4 py-3"
           >
             <div
               class="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
@@ -224,6 +225,15 @@
             <p class="text-sm text-slate-500 tabular-nums">
               {{ formatCreatedAt(user.created_at) }}
             </p>
+            <button
+              type="button"
+              class="list-edit-btn justify-self-center"
+              title="Modifier le profil"
+              :aria-label="`Modifier le profil de ${formatProfileDisplayName(user)}`"
+              @click.stop="openProfileEdit(user.id)"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">edit</span>
+            </button>
             <svg class="w-4 h-4 text-slate-400 justify-self-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
 
@@ -274,6 +284,15 @@
               :role="user.role || 'user'"
               class="shrink-0"
             />
+            <button
+              type="button"
+              class="list-edit-btn shrink-0"
+              title="Modifier le profil"
+              aria-label="Modifier le profil"
+              @click.stop="openProfileEdit(user.id)"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">edit</span>
+            </button>
             <svg class="w-4 h-4 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         </button>
@@ -408,6 +427,11 @@ function openDashboard(userId) {
   router.push(`/admin/dashboard/${userId}`)
 }
 
+function openProfileEdit(userId) {
+  userStore.selectUser(userId)
+  router.push(`/admin/dashboard/${userId}/profile`)
+}
+
 function avatarBg(gender) {
   if (gender === 'female') return 'bg-pink-100'
   if (gender === 'male') return 'bg-sky-100'
@@ -470,6 +494,12 @@ watch([search, filterPlan, filterDate], () => {
 </script>
 
 <style scoped>
+.list-edit-btn {
+  @apply inline-flex items-center justify-center p-1.5 rounded-lg text-slate-500
+         hover:text-brand-accent hover:bg-brand-accent/10 transition-colors
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/40;
+}
+
 .view-toggle {
   @apply inline-flex rounded-xl border border-slate-200 bg-white p-1 gap-0.5;
 }

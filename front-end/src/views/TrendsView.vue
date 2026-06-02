@@ -228,7 +228,9 @@ const activeUserId = ref(null)
 const currentUser = ref(null)
 const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
 
-const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
+const profileEditPath = computed(() =>
+  getProfileEditPath(activeUserId.value, { admin: isAdminScope.value })
+)
 const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
 const profileIssues = computed(() => getProfileIssues(currentUser.value))
 const { profileBlocksAi, planBlocksAi, aiBlocked, aiGateTitle, aiGateDescription } =

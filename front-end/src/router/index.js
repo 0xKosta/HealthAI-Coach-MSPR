@@ -33,6 +33,7 @@ const routes = [
   { path: '/admin/dashboard/:userId/trends',    name: 'AdminTrends',     component: TrendsView,      meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId/nutrition', name: 'AdminNutrition',  component: NutritionView,   meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId/workout',   name: 'AdminWorkout',    component: WorkoutView,     meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/admin/dashboard/:userId/profile',  name: 'AdminProfile',    component: ProfileEditView, meta: { requiresAuth: true, requiresAdmin: true } },
 
   // — Racine : redirige selon l'état d'authentification (géré dans le guard) —
   { path: '/', name: 'Root', redirect: () => '/login' },

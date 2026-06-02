@@ -2,8 +2,17 @@
   <div class="max-w-2xl mx-auto space-y-6 animate-fade-in">
     <div class="flex items-center justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-bold text-brand-primary">Mon profil santé</h1>
-        <p class="text-slate-600 mt-1">Complétez vos informations - l'IMC est calculé automatiquement</p>
+        <h1 class="text-3xl font-bold text-brand-primary">
+          {{ isAdminProfile ? 'Modifier le profil' : 'Mon profil santé' }}
+        </h1>
+        <p class="text-slate-600 mt-1">
+          <template v-if="isAdminProfile">
+            {{ adminDisplayName || 'Utilisateur' }} — l'IMC est calculé automatiquement
+          </template>
+          <template v-else>
+            Complétez vos informations - l'IMC est calculé automatiquement
+          </template>
+        </p>
       </div>
       <RouterLink :to="dashboardLink" class="btn-secondary">Retour</RouterLink>
     </div>
@@ -128,8 +137,8 @@
       </div>
     </form>
 
-    <!-- Zone de danger : suppression définitive du compte -->
-    <div v-if="!loading" class="card border-brand-error/30 bg-brand-error/5">
+    <!-- Zone de danger : compte utilisateur -->
+    <div v-if="!loading && !isAdminProfile" class="card border-brand-error/30 bg-brand-error/5">
       <h2 class="text-lg font-bold text-brand-error">Supprimer mon compte</h2>
       <p class="text-sm text-slate-600 mt-1">
         Cette action est définitive. Toutes vos données seront supprimées et ne pourront pas être récupérées.
@@ -137,6 +146,19 @@
       <button type="button" class="btn-danger mt-4" @click="confirmOpen = true">
         <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
         Supprimer mon compte
+      </button>
+    </div>
+
+    <!-- Zone de danger : profil admin -->
+    <div v-if="!loading && isAdminProfile" class="card border-brand-error/30 bg-brand-error/5">
+      <h2 class="text-lg font-bold text-brand-error">Supprimer ce profil</h2>
+      <p class="text-sm text-slate-600 mt-1">
+        Suppression définitive du profil santé, des mesures, séances et historique associés.
+        <span v-if="hasLinkedAccount"> Le compte lié sera également supprimé.</span>
+      </p>
+      <button type="button" class="btn-danger mt-4" @click="confirmOpen = true">
+        <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+        Supprimer ce profil
       </button>
     </div>
 
@@ -151,11 +173,18 @@
           <div class="w-11 h-11 rounded-xl bg-brand-error/10 flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-brand-error">warning</span>
           </div>
-          <h3 class="text-lg font-bold text-brand-primary">Êtes-vous sûr de supprimer votre compte ?</h3>
+          <h3 class="text-lg font-bold text-brand-primary">{{ confirmTitle }}</h3>
         </div>
         <p class="text-sm text-slate-600">
-          La suppression est <strong>définitive</strong>. Toutes vos données (profil, mesures,
-          séances, historique) seront <strong>perdues</strong> et ne pourront pas être récupérées.
+          <template v-if="isAdminProfile">
+            La suppression de <strong>{{ adminDisplayName || `l'utilisateur #${targetUserId}` }}</strong> est
+            <strong>définitive</strong>. Toutes les données santé (mesures, séances, historique) seront
+            <strong>perdues</strong>.
+          </template>
+          <template v-else>
+            La suppression est <strong>définitive</strong>. Toutes vos données (profil, mesures,
+            séances, historique) seront <strong>perdues</strong> et ne pourront pas être récupérées.
+          </template>
         </p>
         <ErrorAlert v-if="deleteError" :message="deleteError" />
         <div class="flex justify-end gap-3 pt-2">
@@ -171,10 +200,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { authAPI } from '@/services/api'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { authAPI, usersAPI } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
+import { formatProfileDisplayName } from '@/composables/useDisplayName'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import ProfileDataWarning from '@/components/ui/ProfileDataWarning.vue'
@@ -185,8 +215,17 @@ import {
   parseApiErrorDetail,
 } from '@/composables/useBiometricValidation'
 
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+const isAdminProfile = computed(() => route.name === 'AdminProfile')
+
+const targetUserId = computed(() => {
+  if (!isAdminProfile.value) return null
+  const id = Number(route.params.userId)
+  return Number.isFinite(id) ? id : null
+})
 
 const loading = ref(true)
 const loadError = ref('')
@@ -201,6 +240,10 @@ const confirmOpen = ref(false)
 const deleting = ref(false)
 const deleteError = ref('')
 
+const profileName = ref('')
+const adminDisplayName = ref('')
+const hasLinkedAccount = ref(false)
+
 const form = reactive({
   age: null,
   gender: null,
@@ -210,8 +253,17 @@ const form = reactive({
   goal: null,
 })
 
-const dashboardLink = computed(() =>
-  auth.profileId ? `/dashboard/${auth.profileId}` : '/'
+const dashboardLink = computed(() => {
+  if (isAdminProfile.value && targetUserId.value) {
+    return `/admin/dashboard/${targetUserId.value}`
+  }
+  return auth.profileId ? `/dashboard/${auth.profileId}` : '/'
+})
+
+const confirmTitle = computed(() =>
+  isAdminProfile.value
+    ? 'Supprimer ce profil ?'
+    : 'Êtes-vous sûr de supprimer votre compte ?'
 )
 
 const bmi = computed(() => {
@@ -259,31 +311,58 @@ function validate() {
   return result.formError
 }
 
-// Convertit les chaînes vides / NaN en null (cohérence avec la base)
 function clean(value) {
   return value === '' || value === undefined || Number.isNaN(value) ? null : value
+}
+
+function applyProfileToForm(p) {
+  form.age = p.age ?? null
+  form.gender = p.gender ?? null
+  form.weight_kg = p.weight_kg ?? null
+  form.height_cm = p.height_cm ?? null
+  form.body_fat_pct = p.body_fat_pct ?? null
+  form.goal = p.goal ?? null
+  loadedProfileIssues.value = Array.isArray(p.profile_issues) ? p.profile_issues : []
 }
 
 async function loadProfile() {
   loading.value = true
   loadError.value = ''
   try {
-    const res = await authAPI.getProfile()
-    const p = res.data
-    form.age = p.age ?? null
-    form.gender = p.gender ?? null
-    form.weight_kg = p.weight_kg ?? null
-    form.height_cm = p.height_cm ?? null
-    form.body_fat_pct = p.body_fat_pct ?? null
-    form.goal = p.goal ?? null
-    loadedProfileIssues.value = Array.isArray(p.profile_issues) ? p.profile_issues : []
+    if (isAdminProfile.value) {
+      if (!targetUserId.value) {
+        loadError.value = 'Identifiant utilisateur invalide.'
+        return
+      }
+      const res = await usersAPI.getById(targetUserId.value)
+      const p = res.data
+      profileName.value = p.name
+      adminDisplayName.value = formatProfileDisplayName(p)
+      hasLinkedAccount.value = Boolean(p.first_name || p.last_name)
+      applyProfileToForm(p)
+    } else {
+      const res = await authAPI.getProfile()
+      applyProfileToForm(res.data)
+    }
   } catch (e) {
     loadError.value =
       e.response?.status === 404
-        ? "Aucun profil santé lié à ce compte."
+        ? (isAdminProfile.value ? 'Profil introuvable.' : "Aucun profil santé lié à ce compte.")
         : 'Impossible de charger le profil.'
   } finally {
     loading.value = false
+  }
+}
+
+function buildPayload() {
+  return {
+    name: profileName.value,
+    age: clean(form.age),
+    gender: clean(form.gender),
+    weight_kg: clean(form.weight_kg),
+    height_cm: clean(form.height_cm),
+    body_fat_pct: clean(form.body_fat_pct),
+    goal: clean(form.goal),
   }
 }
 
@@ -294,14 +373,18 @@ async function onSubmit() {
   saving.value = true
   try {
     loadedProfileIssues.value = []
-    await authAPI.updateProfile({
-      age: clean(form.age),
-      gender: clean(form.gender),
-      weight_kg: clean(form.weight_kg),
-      height_cm: clean(form.height_cm),
-      body_fat_pct: clean(form.body_fat_pct),
-      goal: clean(form.goal),
-    })
+    if (isAdminProfile.value) {
+      await usersAPI.update(targetUserId.value, buildPayload())
+    } else {
+      await authAPI.updateProfile({
+        age: clean(form.age),
+        gender: clean(form.gender),
+        weight_kg: clean(form.weight_kg),
+        height_cm: clean(form.height_cm),
+        body_fat_pct: clean(form.body_fat_pct),
+        goal: clean(form.goal),
+      })
+    }
     router.push(dashboardLink.value)
   } catch (e) {
     const detail = e.response?.data?.detail
@@ -322,15 +405,30 @@ async function onDelete() {
   deleting.value = true
   deleteError.value = ''
   try {
-    await authAPI.deleteAccount()
-    auth.logout()
-    router.push('/login')
+    if (isAdminProfile.value) {
+      await usersAPI.delete(targetUserId.value)
+      router.push('/admin')
+    } else {
+      await authAPI.deleteAccount()
+      auth.logout()
+      router.push('/login')
+    }
   } catch (e) {
     deleteError.value =
-      e.response?.data?.detail || 'Erreur lors de la suppression du compte.'
+      e.response?.data?.detail ||
+      (isAdminProfile.value
+        ? 'Erreur lors de la suppression du profil.'
+        : 'Erreur lors de la suppression du compte.')
     deleting.value = false
   }
 }
+
+watch(
+  () => route.params.userId,
+  () => {
+    if (isAdminProfile.value) loadProfile()
+  }
+)
 
 onMounted(loadProfile)
 </script>

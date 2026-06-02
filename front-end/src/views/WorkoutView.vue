@@ -146,7 +146,9 @@ const planError = ref('')
 const plan = ref(null)
 
 const hasInvalidProfile = computed(() => hasInvalidProfileData(currentUser.value))
-const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
+const profileEditPath = computed(() =>
+  getProfileEditPath(activeUserId.value, { admin: isAdminScope.value })
+)
 const profileIssues = computed(() => getProfileIssues(currentUser.value))
 const { profileBlocksAi, planBlocksAi, aiBlocked, aiGateTitle, aiGateDescription } =
   useAiGate(currentUser)

@@ -42,6 +42,6 @@ function isActive(tab) {
   if (tab.to.includes('/workout')) return route.path.includes('/workout')
   if (tab.to.includes('/nutrition')) return route.path.includes('/nutrition')
   if (tab.to.includes('/trends')) return route.path.includes('/trends')
-  return /\/dashboard\/\d+$/.test(route.path)
+  return /\/dashboard\/\d+(\/profile)?$/.test(route.path)
 }
 </script>

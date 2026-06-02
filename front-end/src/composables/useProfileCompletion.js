@@ -6,8 +6,11 @@ export function isProfileIncomplete(user) {
   return user.age == null || user.weight_kg == null || user.height_cm == null || !user.goal
 }
 
-export function getProfileEditPath(userId) {
-  return userId ? `/dashboard/${userId}/profile` : '/'
+export function getProfileEditPath(userId, { admin = false } = {}) {
+  if (!userId) return admin ? '/admin' : '/'
+  return admin
+    ? `/admin/dashboard/${userId}/profile`
+    : `/dashboard/${userId}/profile`
 }
 
 export const PROFILE_AI_REQUIRED_MSG =

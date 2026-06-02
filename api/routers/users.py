@@ -1,6 +1,11 @@
 # api/routers/users.py
-# CRUD complet pour la ressource User
-# Préfixe monté dans main.py : /users
+# CRUD profil santé (table users) — préfixe /users
+#
+# Deux parcours distincts :
+#   • Utilisateur connecté : lit son profil (GET /users/{id} si id = le sien) et le
+#     modifie via /auth/me/profile (PUT). Pas d'écriture sur /users/{id}.
+#   • Admin : liste, crée, modifie et supprime n'importe quel profil via /users
+#     (facilite la gestion back-office).
 
 from typing import Literal
 
@@ -11,9 +16,21 @@ from sqlalchemy.orm import Session
 from api.biometrics import resolve_bmi, validate_user_biometrics
 from api.database import get_db
 from api.models import User, UserAuth
+from api.routers.auth import get_current_user, require_admin
 from api.schemas import UserCreate, UserResponse
 
 router = APIRouter()
+
+
+def _ensure_profile_access(current_user: UserAuth, user_id: int) -> None:
+    """Lecture d'un profil : admin ou propriétaire du profil lié au compte."""
+    if current_user.role == "admin":
+        return
+    if current_user.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez pas accéder à ce profil.",
+        )
 
 
 def _to_user_response(user: User, auth: UserAuth | None = None) -> UserResponse:
@@ -50,6 +67,7 @@ def list_users(
     ),
     response: Response = None,
     db: Session = Depends(get_db),
+    _admin: UserAuth = Depends(require_admin),
 ):
     query = db.query(User, UserAuth).outerjoin(UserAuth, UserAuth.user_id == User.id)
     if q:
@@ -82,9 +100,17 @@ def list_users(
     "/{user_id}",
     response_model=UserResponse,
     summary="Récupérer un utilisateur",
-    description="Retourne le profil d'un utilisateur par son identifiant.",
+    description=(
+        "Admin : tout profil. Utilisateur connecté : uniquement son propre profil "
+        "(user_id du token). Pour modifier son profil, utiliser PUT /auth/me/profile."
+    ),
 )
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    _ensure_profile_access(current_user, user_id)
     row = (
         db.query(User, UserAuth)
         .outerjoin(UserAuth, UserAuth.user_id == User.id)
@@ -119,7 +145,11 @@ def _apply_user_payload(user: User, payload: UserCreate) -> None:
     summary="Créer un utilisateur",
     description="Crée un nouveau profil utilisateur. L'IMC est recalculé automatiquement côté serveur.",
 )
-def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    _admin: UserAuth = Depends(require_admin),
+):
     user = User(name=payload.name)
     _apply_user_payload(user, payload)
     db.add(user)
@@ -131,10 +161,15 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
 @router.put(
     "/{user_id}",
     response_model=UserResponse,
-    summary="Mettre à jour un utilisateur",
-    description="Met à jour tous les champs d'un utilisateur existant.",
+    summary="Mettre à jour un utilisateur (admin)",
+    description="Réservé aux administrateurs. Les utilisateurs modifient leur profil via PUT /auth/me/profile.",
 )
-def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int,
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    _admin: UserAuth = Depends(require_admin),
+):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
@@ -150,7 +185,11 @@ def update_user(user_id: int, payload: UserCreate, db: Session = Depends(get_db)
     summary="Supprimer un utilisateur",
     description="Supprime un utilisateur et toutes ses données liées (CASCADE).",
 )
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: UserAuth = Depends(require_admin),
+):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")

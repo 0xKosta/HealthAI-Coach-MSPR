@@ -52,7 +52,10 @@ export const authAPI = {
 
 export const usersAPI = {
   getAll: (params) => api.get('/users/', { params }),
-  getById: (id) => api.get(`/users/${id}`)
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users/', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
 }
 
 export const nutritionAPI = {

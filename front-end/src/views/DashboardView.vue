@@ -14,7 +14,15 @@
         </p>
       </div>
       <div v-if="isAdminScope" class="flex flex-wrap items-center gap-3">
-        <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
+        <RouterLink
+          v-if="activeUserId"
+          :to="profileEditPath"
+          class="btn-primary"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+          Modifier le profil
+        </RouterLink>
+        <button type="button" class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
       </div>
     </div>
 
@@ -370,7 +378,9 @@ const user = computed(() => activeUser.value)
 
 const displayName = useDisplayName(activeUser)
 
-const profileEditPath = computed(() => getProfileEditPath(activeUserId.value))
+const profileEditPath = computed(() =>
+  getProfileEditPath(activeUserId.value, { admin: isAdminScope.value })
+)
 
 const profileIssues = computed(() => getProfileIssues(activeUser.value))
 const hasInvalidProfile = computed(() => hasInvalidProfileData(activeUser.value))
