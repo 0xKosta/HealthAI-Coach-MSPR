@@ -260,8 +260,16 @@
         </div>
       </div>
 
-      <!-- Conseil IA -->
-      <div class="card" :class="{ 'opacity-75': aiBlocked }">
+      <AiRequestHistoryPanel
+        v-if="isAdminScope && activeUserId"
+        :user-id="activeUserId"
+        request-type="advice"
+        title="Historique des conseils IA"
+        description="Tous les conseils personnalisés demandés pour cet utilisateur, du plus récent au plus ancien."
+      />
+
+      <!-- Conseil IA (espace utilisateur) -->
+      <div v-else class="card" :class="{ 'opacity-75': aiBlocked }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div class="flex items-start gap-3">
             <div
@@ -363,6 +371,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 
 const userStore = useUserStore()
 const auth = useAuthStore()

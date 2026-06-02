@@ -6,13 +6,15 @@
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Programme d'Entraînement</h1>
         <p class="text-slate-600 mt-1">
-          {{ aiBlocked
-            ? (planBlocksAi
-              ? 'Passez à Premium pour générer un programme IA'
-              : (hasInvalidProfile
-                ? 'Corrigez votre profil pour générer un programme IA'
-                : 'Complétez votre profil pour générer un programme personnalisé'))
-            : 'Générez un plan IA personnalisé selon votre profil et vos objectifs' }}
+          {{ isAdminScope
+            ? 'Historique des programmes d\'entraînement générés par l\'IA (consultation uniquement)'
+            : (aiBlocked
+              ? (planBlocksAi
+                ? 'Passez à Premium pour générer un programme IA'
+                : (hasInvalidProfile
+                  ? 'Corrigez votre profil pour générer un programme IA'
+                  : 'Complétez votre profil pour générer un programme personnalisé'))
+              : 'Générez un plan IA personnalisé selon votre profil et vos objectifs') }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -25,6 +27,15 @@
     <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
     <ErrorAlert v-else-if="userError" :message="userError" />
 
+    <AiRequestHistoryPanel
+      v-if="isAdminScope && activeUserId && !userLoading && !userError"
+      :user-id="activeUserId"
+      request-type="workout_plan"
+      title="Historique entraînement (plans IA)"
+      description="Paramètres demandés (équipement, fréquence) et réponse IA complète pour chaque génération."
+    />
+
+    <template v-else>
     <ProfileAiGate
       v-if="currentUser && aiBlocked"
       :title="aiGateTitle"
@@ -105,6 +116,7 @@
       </div>
       <AIAdviceCard title="Programme d'entraînement IA" :content="plan.plan" />
     </div>
+    </template>
 
   </div>
 </template>
@@ -128,6 +140,7 @@ import AdminUserTabs from '@/components/layout/AdminUserTabs.vue'
 import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
+import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
 
 const userStore = useUserStore()

@@ -4,7 +4,11 @@
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Tendances Biométriques</h1>
-        <p class="text-slate-600 mt-1">Évolution de vos données de santé sur 30 jours</p>
+        <p class="text-slate-600 mt-1">
+          {{ isAdminScope
+            ? 'Données biométriques et historique des analyses IA tendances (consultation)'
+            : 'Évolution de vos données de santé sur 30 jours' }}
+        </p>
       </div>
       <div v-if="isAdminScope" class="flex items-center gap-3">
         <button class="btn-secondary" @click="goToUsersList">Changer d'utilisateur</button>
@@ -14,7 +18,7 @@
     <AdminUserTabs v-if="activeUserId" :user-id="activeUserId" />
 
     <ProfileAiGate
-      v-if="currentUser && aiBlocked && !userMetrics.length"
+      v-if="currentUser && aiBlocked && !userMetrics.length && !isAdminScope"
       :title="aiGateTitle"
       :description="aiGateDescription"
       :issues="profileBlocksAi ? profileIssues : []"
@@ -71,8 +75,16 @@
         </div>
       </div>
 
-      <!-- Analyse IA -->
-      <div class="card" :class="{ 'opacity-90': !canRunTrendAi }">
+      <AiRequestHistoryPanel
+        v-if="isAdminScope && activeUserId"
+        :user-id="activeUserId"
+        request-type="biometric_trend"
+        title="Historique des analyses IA (tendances)"
+        description="Analyses demandées sur les métriques des 30 derniers jours, sous les graphiques."
+      />
+
+      <!-- Analyse IA (espace utilisateur) -->
+      <div v-else class="card" :class="{ 'opacity-90': !canRunTrendAi }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div class="flex items-start gap-3">
             <div
@@ -186,6 +198,14 @@
         Vous pouvez aussi sélectionner un autre utilisateur dans la liste admin.
       </p>
     </div>
+
+    <AiRequestHistoryPanel
+      v-if="isAdminScope && activeUserId && !metricsLoading && !userMetrics.length"
+      :user-id="activeUserId"
+      request-type="biometric_trend"
+      title="Historique des analyses IA (tendances)"
+      description="Analyses enregistrées même si aucune métrique n'est affichée sur la période."
+    />
   </div>
 </template>
 
@@ -213,6 +233,7 @@ import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
+import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 
 const userStore = useUserStore()
 const { isAdminScope } = useDashboardScope()

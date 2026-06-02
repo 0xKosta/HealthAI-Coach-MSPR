@@ -5,13 +5,15 @@
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Analyse Nutritionnelle</h1>
         <p class="text-slate-600 mt-1">
-          {{ aiBlocked
-            ? (planBlocksAi
-              ? 'Passez à Premium pour analyser vos repas par photo'
-              : (hasInvalidProfile
-                ? 'Corrigez votre profil pour activer l\'analyse photo IA'
-                : 'Complétez votre profil pour activer l\'analyse photo IA'))
-            : "Analysez un repas par photo grâce à l'IA vision" }}
+          {{ isAdminScope
+            ? 'Historique des analyses photo IA pour cet utilisateur (consultation uniquement)'
+            : (aiBlocked
+              ? (planBlocksAi
+                ? 'Passez à Premium pour analyser vos repas par photo'
+                : (hasInvalidProfile
+                  ? 'Corrigez votre profil pour activer l\'analyse photo IA'
+                  : 'Complétez votre profil pour activer l\'analyse photo IA'))
+              : "Analysez un repas par photo grâce à l'IA vision") }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -24,6 +26,15 @@
     <LoadingSpinner v-if="userLoading" message="Chargement du profil utilisateur..." />
     <ErrorAlert v-else-if="userError" :message="userError" />
 
+    <AiRequestHistoryPanel
+      v-if="isAdminScope && activeUserId && !userLoading && !userError"
+      :user-id="activeUserId"
+      request-type="analyze_photo"
+      title="Historique nutrition (photos IA)"
+      description="Chaque ligne correspond à une photo analysée : aliments, macros et conseil enregistrés."
+    />
+
+    <template v-else>
     <ProfileAiGate
       v-if="currentUser && aiBlocked"
       :title="aiGateTitle"
@@ -120,6 +131,7 @@
       <!-- Analyse IA — fond bleu nuit -->
       <AIAdviceCard v-if="result.advice" title="Analyse nutritionnelle IA" :content="result.advice" />
     </template>
+    </template>
   </div>
 </template>
 
@@ -142,6 +154,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner.vue'
 import ErrorAlert from '@/components/ui/ErrorAlert.vue'
 import AIAdviceCard from '@/components/ui/AIAdviceCard.vue'
 import ProfileAiGate from '@/components/ui/ProfileAiGate.vue'
+import AiRequestHistoryPanel from '@/components/admin/AiRequestHistoryPanel.vue'
 
 const userStore = useUserStore()
 const { isAdminScope } = useDashboardScope()
