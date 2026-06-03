@@ -17,8 +17,8 @@ def test_health_returns_200(client):
 # /users
 # =============================================================================
 
-def test_list_users_returns_200(client):
-    response = client.get("/users/")
+def test_list_users_returns_200(client, admin_headers):
+    response = client.get("/users/", headers=admin_headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -29,21 +29,23 @@ def test_create_user_valid_returns_201(client, created_user):
     assert "id" in created_user
 
 
-def test_create_user_invalid_age_returns_400(client):
-    response = client.post("/users/", json={"name": "Bob", "age": 17})
+def test_create_user_invalid_age_returns_400(client, admin_headers):
+    response = client.post(
+        "/users/", json={"name": "Bob", "age": 17}, headers=admin_headers
+    )
     assert response.status_code == 400
     assert "âge" in response.json()["detail"].lower()
 
 
-def test_get_user_not_found_returns_404(client):
-    response = client.get("/users/99999")
+def test_get_user_not_found_returns_404(client, admin_headers):
+    response = client.get("/users/99999", headers=admin_headers)
     assert response.status_code == 404
     assert response.json()["detail"] == "Utilisateur introuvable"
 
 
-def test_get_user_by_id(client, created_user):
+def test_get_user_by_id(client, created_user, admin_headers):
     uid = created_user["id"]
-    response = client.get(f"/users/{uid}")
+    response = client.get(f"/users/{uid}", headers=admin_headers)
     assert response.status_code == 200
     assert response.json()["id"] == uid
 

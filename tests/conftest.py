@@ -102,15 +102,53 @@ def admin_auth_headers(created_user):
 
 
 @pytest.fixture(scope="session")
-def created_user(client):
-    payload = {
-        "name": "Alice Martin",
-        "age": 30,
-        "gender": "female",
-        "weight_kg": 65.0,
-        "height_cm": 170.0,
-        "goal": "weight_loss",
-    }
-    response = client.post("/users/", json=payload)
-    assert response.status_code == 201
-    return response.json()
+def created_user(create_tables):
+    """Profil santé de test — créé en base (POST /users/ exige un admin JWT)."""
+    from api.models import User
+    from api.schemas import UserResponse
+
+    db = TestingSessionLocal()
+    user = User(
+        name="Alice Martin",
+        age=30,
+        gender="female",
+        weight_kg=65.0,
+        height_cm=170.0,
+        goal="weight_loss",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    data = UserResponse.model_validate(user).model_dump(mode="json")
+    db.close()
+    return data
+
+
+@pytest.fixture(scope="session")
+def admin_headers(created_user):
+    """JWT admin pour les routes /users/* réservées au back-office."""
+    from api.models import UserAuth
+    from api.routers.auth import create_token, hash_password
+
+    db = TestingSessionLocal()
+    account = (
+        db.query(UserAuth).filter(UserAuth.user_id == created_user["id"]).first()
+    )
+    if not account:
+        account = UserAuth(
+            user_id=created_user["id"],
+            email="admin.tests@healthai-coach.local",
+            password_hash=hash_password("testpass"),
+            first_name="Admin",
+            last_name="Tests",
+            role="admin",
+            plan="free",
+        )
+        db.add(account)
+    else:
+        account.role = "admin"
+    db.commit()
+    db.refresh(account)
+    token = create_token(account.id)
+    db.close()
+    return {"Authorization": f"Bearer {token}"}

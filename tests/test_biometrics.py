@@ -55,51 +55,66 @@ class TestBiometricsUnit:
 class TestBiometricsApi:
     """Tests API — réutilise la fixture `client` de test_routes."""
 
-    def test_create_user_valid_bmi_computed(self, client):
+    def test_create_user_valid_bmi_computed(self, client, admin_headers):
         payload = {
             "name": "Valid User",
             "age": 25,
             "weight_kg": 70,
             "height_cm": 175,
         }
-        res = client.post("/users/", json=payload)
+        res = client.post("/users/", json=payload, headers=admin_headers)
         assert res.status_code == 201
         data = res.json()
         assert data["bmi"] == pytest.approx(22.86, abs=0.01)
 
-    def test_create_user_age_too_young_returns_400(self, client):
-        res = client.post("/users/", json={"name": "Young", "age": 17})
+    def test_create_user_age_too_young_returns_400(self, client, admin_headers):
+        res = client.post(
+            "/users/", json={"name": "Young", "age": 17}, headers=admin_headers
+        )
         assert res.status_code == 400
         assert "âge" in res.json()["detail"].lower()
 
-    def test_create_user_height_out_of_range_returns_400(self, client):
+    def test_create_user_height_out_of_range_returns_400(self, client, admin_headers):
         res = client.post(
             "/users/",
             json={"name": "Tall", "age": 30, "height_cm": 50, "weight_kg": 70},
+            headers=admin_headers,
         )
         assert res.status_code == 400
         assert "taille" in res.json()["detail"].lower()
 
-    def test_create_user_weight_out_of_range_returns_400(self, client):
+    def test_create_user_weight_out_of_range_returns_400(self, client, admin_headers):
         res = client.post(
             "/users/",
             json={"name": "Light", "age": 30, "weight_kg": 10, "height_cm": 170},
+            headers=admin_headers,
         )
         assert res.status_code == 400
         assert "poids" in res.json()["detail"].lower()
 
-    def test_create_user_bmi_out_of_range_returns_400(self, client):
+    def test_create_user_bmi_out_of_range_returns_400(self, client, admin_headers):
         res = client.post(
             "/users/",
             json={"name": "Extreme", "age": 30, "weight_kg": 300, "height_cm": 90},
+            headers=admin_headers,
         )
         assert res.status_code == 400
         assert "imc" in res.json()["detail"].lower()
 
-    def test_update_user_invalid_age_returns_400(self, client, created_user):
+    def test_update_user_invalid_age_returns_400(
+        self, client, created_user, admin_headers
+    ):
         uid = created_user["id"]
         res = client.put(
             f"/users/{uid}",
-            json={**created_user, "age": 15, "name": created_user["name"]},
+            json={
+                "name": created_user["name"],
+                "age": 15,
+                "gender": created_user.get("gender"),
+                "weight_kg": created_user.get("weight_kg"),
+                "height_cm": created_user.get("height_cm"),
+                "goal": created_user.get("goal"),
+            },
+            headers=admin_headers,
         )
         assert res.status_code == 400
