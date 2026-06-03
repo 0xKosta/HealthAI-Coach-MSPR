@@ -4,8 +4,15 @@ import { useDashboardScope } from './useDashboardScope'
 
 // Navigation ordonnée entre les 4 vues partagées
 // (Dashboard ← Nutrition ← Entraînement ← Tendances).
-// Swipe / glisser horizontal : Pointer Events (tactile + souris en PWA desktop).
+// Swipe horizontal : ne pas intercepter les clics sur liens / boutons.
 const SWIPE_THRESHOLD = 55
+
+function isInteractiveTarget(target) {
+  if (!target || !(target instanceof Element)) return false
+  return !!target.closest(
+    'a, button, input, select, textarea, label, [role="button"], [role="tab"], .nutrition-tabs, .nutrition-module-nav'
+  )
+}
 
 export function useViewNav(userIdRef) {
   const route = useRoute()
@@ -44,22 +51,13 @@ export function useViewNav(userIdRef) {
   let lockedHorizontal = false
   let tracking = false
 
-  function resetTracking() {
-    tracking = false
-    lockedHorizontal = false
-  }
-
   function onPointerDown(event) {
+    if (isInteractiveTarget(event.target)) return
     if (event.pointerType === 'mouse' && event.button !== 0) return
     startX = event.clientX
     startY = event.clientY
     lockedHorizontal = false
     tracking = true
-    try {
-      event.currentTarget?.setPointerCapture(event.pointerId)
-    } catch {
-      /* ignore */
-    }
   }
 
   function onPointerMove(event) {
@@ -70,6 +68,11 @@ export function useViewNav(userIdRef) {
     const dy = event.clientY - startY
     if (!lockedHorizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
       lockedHorizontal = true
+      try {
+        event.currentTarget?.setPointerCapture(event.pointerId)
+      } catch {
+        /* ignore */
+      }
     }
     if (lockedHorizontal && event.cancelable) {
       event.preventDefault()
@@ -85,6 +88,8 @@ export function useViewNav(userIdRef) {
     } catch {
       /* ignore */
     }
+
+    if (!lockedHorizontal) return
 
     const dx = event.clientX - startX
     const dy = event.clientY - startY
@@ -104,6 +109,5 @@ export function useViewNav(userIdRef) {
     onPointerDown,
     onPointerMove,
     onPointerUp,
-    resetTracking,
   }
 }
