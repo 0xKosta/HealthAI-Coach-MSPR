@@ -1,5 +1,11 @@
 <template>
-  <div class="space-y-8 animate-fade-in" @touchstart.passive="onTouchStart" @touchmove="onTouchMove" @touchend.passive="onTouchEnd">
+  <div
+    class="space-y-8 animate-fade-in view-swipe-nav"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+  >
 
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
@@ -344,7 +350,7 @@ const { isAdminScope } = useDashboardScope()
 const route = useRoute()
 const router = useRouter()
 const activeUserId = ref(null)
-const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
+const { onPointerDown, onPointerMove, onPointerUp } = useViewNav(activeUserId)
 const currentUser = ref(null)
 const userLoading = ref(false)
 const userError = ref('')

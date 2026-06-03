@@ -4,9 +4,8 @@ import { useDashboardScope } from './useDashboardScope'
 
 // Navigation ordonnée entre les 4 vues partagées
 // (Dashboard ← Nutrition ← Entraînement ← Tendances).
-// Fournit la liste d'onglets, l'index actif, des helpers de navigation
-// et des handlers tactiles pour le swipe gauche/droite sur mobile.
-const SWIPE_THRESHOLD = 55 // px de déplacement horizontal minimum
+// Swipe / glisser horizontal : Pointer Events (tactile + souris en PWA desktop).
+const SWIPE_THRESHOLD = 55
 
 export function useViewNav(userIdRef) {
   const route = useRoute()
@@ -43,22 +42,32 @@ export function useViewNav(userIdRef) {
   let startX = 0
   let startY = 0
   let lockedHorizontal = false
+  let tracking = false
 
-  function onTouchStart(event) {
-    const touch = event.changedTouches?.[0]
-    if (!touch) return
-    startX = touch.clientX
-    startY = touch.clientY
+  function resetTracking() {
+    tracking = false
     lockedHorizontal = false
   }
 
-  // Dès qu'un geste devient franchement horizontal, on bloque le comportement
-  // natif du navigateur (geste "retour"/"suivant"), qui sinon recharge la page.
-  function onTouchMove(event) {
-    const touch = event.touches?.[0]
-    if (!touch) return
-    const dx = touch.clientX - startX
-    const dy = touch.clientY - startY
+  function onPointerDown(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    startX = event.clientX
+    startY = event.clientY
+    lockedHorizontal = false
+    tracking = true
+    try {
+      event.currentTarget?.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onPointerMove(event) {
+    if (!tracking) return
+    if (event.pointerType === 'mouse' && !(event.buttons & 1)) return
+
+    const dx = event.clientX - startX
+    const dy = event.clientY - startY
     if (!lockedHorizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
       lockedHorizontal = true
     }
@@ -67,18 +76,34 @@ export function useViewNav(userIdRef) {
     }
   }
 
-  function onTouchEnd(event) {
-    const touch = event.changedTouches?.[0]
-    if (!touch) return
-    const dx = touch.clientX - startX
-    const dy = touch.clientY - startY
-    // On n'agit que sur un swipe franchement horizontal pour ne pas
-    // gêner le scroll vertical ni les graphiques (Tendances).
-    const isHorizontal = Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2
+  function onPointerUp(event) {
+    if (!tracking) return
+    tracking = false
+
+    try {
+      event.currentTarget?.releasePointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+
+    const dx = event.clientX - startX
+    const dy = event.clientY - startY
+    const isHorizontal =
+      Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2
     if (!isHorizontal) return
     if (dx < 0) goNext()
     else goPrev()
   }
 
-  return { tabs, activeIndex, goTo, goNext, goPrev, onTouchStart, onTouchMove, onTouchEnd }
+  return {
+    tabs,
+    activeIndex,
+    goTo,
+    goNext,
+    goPrev,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    resetTracking,
+  }
 }

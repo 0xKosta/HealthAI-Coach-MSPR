@@ -316,6 +316,8 @@ Automatisé via GitHub Actions (`.github/workflows/etl.yml`) : quotidien à 3h U
 
 ## Tests
 
+### API — pytest (services critiques)
+
 ```bash
 # Lancer les tests
 pytest tests/ -v
@@ -333,7 +335,7 @@ Rapport HTML : ouvrir `htmlcov/index.html` dans le navigateur.
 
 > Si `pytest-cov` n'est pas installé : `pip install pytest-cov`
 
-**Couverture indicative : ~73%** — lancer `pytest tests/ -v` pour l'état actuel (biométrie : `tests/test_biometrics.py`).
+**Couverture indicative : ~73%** — lancer `pytest tests/ -v` pour l'état actuel (57 tests, dont `tests/test_biometrics.py`).
 
 | Fichier | Couverture |
 |---------|-----------|
@@ -345,6 +347,17 @@ Rapport HTML : ouvrir `htmlcov/index.html` dans le navigateur.
 | `api/routers/metrics.py` | 61% |
 | `api/routers/nutrition.py` | 49% |
 | `api/routers/exercises.py` | 41% |
+
+### Frontend — Vitest (logique UI)
+
+```bash
+cd front-end
+npm test
+```
+
+**7 tests unitaires** sur la logique métier critique : accès IA selon le profil (`useProfileCompletion`), détection panne réseau (`apiStatusStore`). Les parcours complets (login, nutrition, PWA) sont validés en recette manuelle ; E2E Cypress prévu en MSPR3.
+
+Détail : [`front-end/README.md`](front-end/README.md).
 
 ---
 

@@ -1,5 +1,11 @@
 <template>
-  <div class="space-y-8 animate-fade-in" @touchstart.passive="onTouchStart" @touchmove="onTouchMove" @touchend.passive="onTouchEnd">
+  <div
+    class="space-y-8 animate-fade-in view-swipe-nav"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+  >
 
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
@@ -262,7 +268,7 @@ const trendLoading = ref(false)
 const trendError = ref('')
 const activeUserId = ref(null)
 const currentUser = ref(null)
-const { onTouchStart, onTouchMove, onTouchEnd } = useViewNav(activeUserId)
+const { onPointerDown, onPointerMove, onPointerUp } = useViewNav(activeUserId)
 
 const profileEditPath = computed(() =>
   getProfileEditPath(activeUserId.value, { admin: isAdminScope.value })

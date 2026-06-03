@@ -41,8 +41,17 @@ npm install
 | `npm run dev` | Dev — `http://localhost:3000` |
 | `npm run build` | Build production → `dist/` |
 | `npm run preview` | Preview du build — `http://localhost:4173` |
+| `npm test` | Tests unitaires front (Vitest) — logique profil IA & statut API |
 
 > Le Service Worker PWA est **désactivé en `dev`**. Tester l'installation PWA : `npm run build && npm run preview`.
+
+### Tests front (Vitest)
+
+```bash
+npm test
+```
+
+Couvre la logique métier UI critique (`useProfileCompletion`, détection panne réseau). Les parcours complets (login, nutrition) restent en recette manuelle / E2E prévus MSPR3.
 
 ---
 
