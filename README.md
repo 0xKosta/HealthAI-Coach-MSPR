@@ -24,14 +24,12 @@ Sources brutes (Kaggle CSV + GitHub JSON)
    PostgreSQL — Supabase
    9 tables relationnelles
           │
-     ┌────┴────────────┐
-     ▼                 ▼
- API REST           Frontend
- (FastAPI)          (Vue 3 + Vite + PWA)
+     ┌────┴────────────┬──────────────┐
+     ▼                 ▼              ▼
+ API REST           Frontend    Recommender ML
+ (FastAPI :8000)    (:5173)     (FastAPI :8001, Random Forest)
      │
-     ▼
- OpenAI GPT-4o
- (coach IA, vision, tendances)
+     └─ OpenAI GPT-4o (coach IA, vision, tendances)
 ```
 
 **Sources de données :**
@@ -207,6 +205,42 @@ uvicorn api.main:app --reload
 
 ---
 
+## Démarrage rapide MSPR2
+
+Pour tester l'application complète (API + front + micro-service ML), ouvrir **trois terminaux** (venv activé sur les terminaux Python) :
+
+| Terminal | Commande | URL |
+|----------|----------|-----|
+| 1 — API principale | `uvicorn api.main:app --reload` | http://localhost:8000/docs |
+| 2 — Frontend | `cd front-end` puis `npm run dev` | http://localhost:5173 |
+| 3 — Recommandation ML | `uvicorn recommender.main:app --port 8001 --reload` | http://localhost:8001/docs |
+
+**Prérequis recommender :** `pip install -r recommender/requirements.txt` et présence de `recommender/model.pkl` (sinon `python -m recommender.train`).
+
+---
+
+## Moteur de recommandation (MSPR2)
+
+Micro-service FastAPI **séparé** de l'API principale — prédit le type d'entraînement (`Cardio`, `HIIT`, `Strength`, `Yoga`) via une **forêt aléatoire** (scikit-learn).
+
+| Élément | Détail |
+|---------|--------|
+| Port | **8001** (l'API coach OpenAI reste sur **8000**) |
+| Endpoint principal | `POST /recommend` |
+| Historique optionnel | MongoDB (`MONGO_URI` dans `.env`) — l'API fonctionne sans Mongo |
+| Documentation | [`recommender/README.md`](recommender/README.md) — entraînement, évaluation, correspondance grille Bloc 2 |
+| Notebook | [`notebooks/ml_recommendation.ipynb`](notebooks/ml_recommendation.ipynb) |
+
+**Métriques indicatives (modèle `rf_200`, 438 lignes) :**
+
+| Indicateur | Valeur |
+|------------|--------|
+| Cross-validation (5 folds) | ~80 % |
+| Accuracy test | ~75 % |
+| F1-score pondéré | ~0,75 |
+
+---
+
 ## Endpoints disponibles
 
 ### Données métier
@@ -352,6 +386,13 @@ front-end/
 │   ├── services/        # api.js — appels HTTP
 │   └── stores/          # Pinia — état global (userStore, authStore)
 └── vite.config.js
+
+recommender/            # Micro-service ML MSPR2 (port 8001)
+├── main.py             # FastAPI — POST /recommend
+├── train.py            # Entraînement Random Forest
+├── evaluate.py         # Métriques F1, matrice de confusion
+├── model.pkl           # Modèle entraîné (rf_200)
+└── README.md           # Lancement, grille Bloc 2, MongoDB
 
 etl/
 ├── pipeline.py          # Orchestrateur principal
