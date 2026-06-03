@@ -17,6 +17,11 @@
         "summary": "Lister les utilisateurs",
         "description": "Retourne la liste paginée de tous les utilisateurs enregistrés.",
         "operationId": "list_users_users__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "skip",
@@ -62,6 +67,46 @@
               "title": "Q"
             },
             "description": "Filtre de recherche sur le nom/prénom"
+          },
+          {
+            "name": "plan",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "free",
+                    "premium",
+                    "premium_plus"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtre sur l'offre user_auth",
+              "title": "Plan"
+            },
+            "description": "Filtre sur l'offre user_auth"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "id_asc",
+                "created_desc",
+                "created_asc"
+              ],
+              "type": "string",
+              "description": "Tri par identifiant ou date de création du profil",
+              "default": "id_asc",
+              "title": "Sort"
+            },
+            "description": "Tri par identifiant ou date de création du profil"
           }
         ],
         "responses": {
@@ -95,9 +140,14 @@
         "tags": [
           "Utilisateurs"
         ],
-        "summary": "Créer un utilisateur",
-        "description": "Crée un nouveau profil utilisateur. L'IMC est recalculé automatiquement côté serveur.",
+        "summary": "Créer un profil santé seul (admin)",
+        "description": "Réservé aux administrateurs. Préférer POST /auth/admin/users pour un compte complet (user_auth + profil vide). Cet endpoint crée uniquement la table users.",
         "operationId": "create_user_users__post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -138,8 +188,13 @@
           "Utilisateurs"
         ],
         "summary": "Récupérer un utilisateur",
-        "description": "Retourne le profil d'un utilisateur par son identifiant.",
+        "description": "Admin : tout profil. Utilisateur connecté : uniquement son propre profil (user_id du token). Pour modifier son profil, utiliser PUT /auth/me/profile.",
         "operationId": "get_user_users__user_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -178,9 +233,14 @@
         "tags": [
           "Utilisateurs"
         ],
-        "summary": "Mettre à jour un utilisateur",
-        "description": "Met à jour tous les champs d'un utilisateur existant.",
+        "summary": "Mettre à jour un utilisateur (admin)",
+        "description": "Réservé aux administrateurs. Les utilisateurs modifient leur profil via PUT /auth/me/profile.",
         "operationId": "update_user_users__user_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -232,6 +292,11 @@
         "summary": "Supprimer un utilisateur",
         "description": "Supprime un utilisateur et toutes ses données liées (CASCADE).",
         "operationId": "delete_user_users__user_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -1718,7 +1783,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/coach/analyze-photo": {
@@ -1760,7 +1830,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/coach/workout-plan": {
@@ -1802,7 +1877,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/coach/meal-plan": {
@@ -1844,7 +1924,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
       }
     },
     "/coach/biometric-trend": {
@@ -1886,6 +1971,113 @@
               }
             }
           }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/ai-requests/": {
+      "get": {
+        "tags": [
+          "Historique IA"
+        ],
+        "summary": "Historique des requêtes IA",
+        "description": "Liste chronologique des appels coach IA pour un utilisateur. Admin : accès complet. Utilisateur : son profil uniquement, fenêtre glissante (Premium 7 j / 20 entrées, Premium+ 30 j / 50 entrées par type).",
+        "operationId": "list_ai_requests_ai_requests__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Profil utilisateur (users.id)",
+              "title": "User Id"
+            },
+            "description": "Profil utilisateur (users.id)"
+          },
+          {
+            "name": "request_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "advice",
+                    "analyze_photo",
+                    "workout_plan",
+                    "biometric_trend",
+                    "meal_plan"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrer par type de requête",
+              "title": "Request Type"
+            },
+            "description": "Filtrer par type de requête"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiRequestResponse"
+                  },
+                  "title": "Response List Ai Requests Ai Requests  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1913,6 +2105,111 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/admin/users": {
+      "post": {
+        "tags": [
+          "Authentification"
+        ],
+        "summary": "Créer un compte utilisateur (admin)",
+        "description": "Crée un compte user_auth (prénom, nom, email, mot de passe) et un profil santé users vide, comme à l'inscription. Les données biométriques se complètent ensuite.",
+        "operationId": "admin_create_user_auth_admin_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCreateAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCreateAccountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/admin/users/{profile_user_id}": {
+      "put": {
+        "tags": [
+          "Authentification"
+        ],
+        "summary": "Modifier le compte lié à un profil (admin)",
+        "description": "Met à jour user_auth (email, prénom, nom, plan, rôle) pour le profil santé identifié par profile_user_id (users.id).",
+        "operationId": "admin_update_user_account_auth_admin_users__profile_user_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Profile User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUpdateAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCreateAccountResponse"
                 }
               }
             }
@@ -2406,6 +2703,300 @@
   },
   "components": {
     "schemas": {
+      "AdminCreateAccountRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "title": "Password"
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Last Name"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "premium",
+              "premium_plus"
+            ],
+            "title": "Plan",
+            "default": "free"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin",
+              "demo"
+            ],
+            "title": "Role",
+            "default": "user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "first_name",
+          "last_name"
+        ],
+        "title": "AdminCreateAccountRequest",
+        "description": "Mêmes champs que l'inscription — création par un admin."
+      },
+      "AdminCreateAccountResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name"
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "first_name",
+          "last_name",
+          "user_id",
+          "role",
+          "plan"
+        ],
+        "title": "AdminCreateAccountResponse"
+      },
+      "AdminUpdateAccountRequest": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "premium",
+                  "premium_plus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "admin",
+                  "demo"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "title": "AdminUpdateAccountRequest",
+        "description": "Mise à jour du compte user_auth lié à un profil santé (users.id)."
+      },
+      "AiRequestResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "request_type": {
+            "type": "string",
+            "title": "Request Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "input_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Summary"
+          },
+          "output_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Summary"
+          },
+          "input_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Json"
+          },
+          "output_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Json"
+          },
+          "photo_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Path"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "from_cache": {
+            "type": "boolean",
+            "title": "From Cache",
+            "default": false
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "request_type",
+          "status",
+          "created_at"
+        ],
+        "title": "AiRequestResponse",
+        "description": "Une entrée d'historique IA (GET /ai-requests)."
+      },
       "BiometricMetricCreate": {
         "properties": {
           "user_id": {
@@ -3434,6 +4025,18 @@
               }
             ],
             "title": "User Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          },
+          "can_use_ai": {
+            "type": "boolean",
+            "title": "Can Use Ai"
           }
         },
         "type": "object",
@@ -3443,7 +4046,10 @@
           "first_name",
           "last_name",
           "avatar_url",
-          "user_id"
+          "user_id",
+          "role",
+          "plan",
+          "can_use_ai"
         ],
         "title": "MeResponse"
       },
@@ -4185,6 +4791,79 @@
             "type": "string",
             "maxLength": 100,
             "title": "Name"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name",
+            "description": "Prénom du compte user_auth lié, si présent"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name",
+            "description": "Nom du compte user_auth lié, si présent"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email",
+            "description": "Email du compte user_auth lié, si présent"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "premium",
+                  "premium_plus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan",
+            "description": "Offre du compte user_auth lié, si présent"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "admin",
+                  "demo"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "Rôle du compte user_auth lié, si présent"
           },
           "age": {
             "anyOf": [
