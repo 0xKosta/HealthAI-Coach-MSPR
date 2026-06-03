@@ -1,27 +1,40 @@
 <template>
   <div class="min-h-screen bg-brand-light">
-    <Navbar v-if="showChrome" />
-    <main :class="showChrome ? 'pt-20 pb-16 sm:pt-16 sm:pb-0' : ''">
-      <div :class="showChrome ? 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8' : ''">
-        <RouterView v-slot="{ Component }">
-          <Transition :name="transitionName" mode="out-in">
-            <component :is="Component" />
-          </Transition>
-        </RouterView>
-      </div>
-    </main>
+    <ServerUnavailableView
+      v-if="!apiStatus.online"
+      :checking="apiStatus.checking"
+      @retry="apiStatus.checkHealth"
+    />
+    <template v-else>
+      <Navbar v-if="showChrome" />
+      <main :class="showChrome ? 'pt-20 pb-16 sm:pt-16 sm:pb-0' : ''">
+        <div :class="showChrome ? 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8' : ''">
+          <RouterView v-slot="{ Component }">
+            <Transition :name="transitionName" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </RouterView>
+        </div>
+      </main>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Navbar from '@/components/layout/Navbar.vue'
+import ServerUnavailableView from '@/components/ui/ServerUnavailableView.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useApiStatusStore } from '@/stores/apiStatusStore'
 import { transitionName } from '@/router/transition'
 
 const route = useRoute()
 const auth = useAuthStore()
+const apiStatus = useApiStatusStore()
+
+onMounted(() => apiStatus.startPolling())
+onUnmounted(() => apiStatus.stopPolling())
 
 // Pas de navbar sur les pages d'authentification ni l'écran "sans profil"
 const showChrome = computed(

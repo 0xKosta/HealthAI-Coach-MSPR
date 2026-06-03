@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authAPI, TOKEN_KEY } from '@/services/api'
+import { isNetworkFailure, OFFLINE_MESSAGE } from '@/stores/apiStatusStore'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem(TOKEN_KEY) || '')
@@ -33,8 +34,9 @@ export const useAuthStore = defineStore('auth', () => {
       await fetchMe()
       return true
     } catch (e) {
-      error.value =
-        e.response?.status === 401
+      error.value = isNetworkFailure(e)
+        ? OFFLINE_MESSAGE
+        : e.response?.status === 401
           ? 'Email ou mot de passe incorrect.'
           : "Erreur de connexion. Vérifiez l'API."
       setToken('')
@@ -54,8 +56,9 @@ export const useAuthStore = defineStore('auth', () => {
       await fetchMe()
       return true
     } catch (e) {
-      error.value =
-        e.response?.status === 409
+      error.value = isNetworkFailure(e)
+        ? OFFLINE_MESSAGE
+        : e.response?.status === 409
           ? 'Un compte existe déjà avec cet email.'
           : "Impossible de créer le compte. Vérifiez les champs."
       setToken('')

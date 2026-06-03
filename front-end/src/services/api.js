@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { isNetworkFailure, useApiStatusStore } from '@/stores/apiStatusStore'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -22,9 +23,16 @@ api.interceptors.request.use((config) => {
 
 // Sur 401, on purge le token : la session est invalide ou expirée.
 // La redirection vers /login est gérée par le guard de navigation.
+// Absence de réponse (API arrêtée, réseau) → écran « serveur déconnecté ».
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    useApiStatusStore().markOnline()
+    return response
+  },
   (error) => {
+    if (isNetworkFailure(error)) {
+      useApiStatusStore().markOffline()
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY)
     }
