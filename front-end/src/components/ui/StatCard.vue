@@ -1,5 +1,5 @@
 <template>
-  <!-- Fond #F4F7FB (fond neutre) — cartes/Dashboard/surfaces UI -->
+  <!-- Fond #F4F7FB (fond neutre) - cartes/Dashboard/surfaces UI -->
   <div class="card-sm flex items-center gap-4">
     <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" :class="iconBg">
       <svg class="w-6 h-6" :class="iconColor" viewBox="0 0 24 24" fill="none"

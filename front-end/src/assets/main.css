@@ -39,7 +39,7 @@
            bg-brand-error hover:bg-red-700 text-white font-semibold rounded-xl transition-all duration-200;
   }
 
-  /* Cartes — fond neutre #F4F7FB */
+  /* Cartes - fond neutre #F4F7FB */
   .card {
     @apply bg-brand-neutral border border-slate-200 rounded-2xl p-6 shadow-sm;
   }
@@ -95,7 +95,7 @@
     @apply text-2xl font-bold text-brand-primary;
   }
 
-  /* Carte IA — dégradé bleu nuit */
+  /* Carte IA - dégradé bleu nuit */
   .ai-card {
     @apply bg-gradient-to-br from-brand-primary to-brand-secondary
            border border-brand-secondary/60 rounded-2xl p-6 shadow-md;
@@ -125,7 +125,7 @@
 ::-webkit-scrollbar-thumb { background: #c7d9ee; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #00B4D8; }
 
-/* Prose IA — texte sur fond sombre (ai-card) */
+/* Prose IA - texte sur fond sombre (ai-card) */
 .ai-prose h1, .ai-prose h2, .ai-prose h3, .ai-prose h4, .ai-prose h5 {
   @apply font-bold text-brand-accent mb-2 mt-4;
 }

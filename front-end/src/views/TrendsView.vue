@@ -36,7 +36,7 @@
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard
           label="Poids actuel"
-          :value="`${latestMetric?.weight_kg?.toFixed(1) ?? '—'} kg`"
+          :value="`${latestMetric?.weight_kg?.toFixed(1) ?? '-'} kg`"
           :sub="weightDelta"
           icon='<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'
           iconBg="bg-brand-accent/10" iconColor="text-brand-accent"
@@ -61,7 +61,7 @@
         />
       </div>
 
-      <!-- Graphiques — fond #F4F7FB -->
+      <!-- Graphiques - fond #F4F7FB -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="card">
           <h3 class="text-lg font-semibold text-brand-primary mb-1">Évolution du poids</h3>
@@ -142,7 +142,7 @@
           <p class="text-xs text-slate-600 mt-2">
             {{ trendDaysRemaining > 0
               ? `Encore ${trendDaysRemaining} jour${trendDaysRemaining > 1 ? 's' : ''} pour débloquer l'analyse IA.`
-              : 'Presque prêt — continuez la synchronisation.' }}
+              : 'Presque prêt - continuez la synchronisation.' }}
           </p>
         </div>
 
@@ -307,7 +307,7 @@ const weightDelta = computed(() => {
 const avgSleep = computed(() => {
   const v = userMetrics.value.filter(m => m.sleep_hours)
 
-  if (!v.length) return '—'
+  if (!v.length) return '-'
 
   const avg = v.reduce((s, m) => s + m.sleep_hours, 0) / v.length
   const totalMinutes = Math.round(avg * 60)
@@ -319,7 +319,7 @@ const avgSleep = computed(() => {
 })
 const avgBpm = computed(() => {
   const v = userMetrics.value.filter(m => m.resting_bpm)
-  return v.length ? Math.round(v.reduce((s, m) => s + m.resting_bpm, 0) / v.length) : '—'
+  return v.length ? Math.round(v.reduce((s, m) => s + m.resting_bpm, 0) / v.length) : '-'
 })
 
 const xCategories = computed(() =>

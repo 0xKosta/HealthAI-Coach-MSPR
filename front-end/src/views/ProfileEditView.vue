@@ -7,7 +7,7 @@
         </h1>
         <p class="text-slate-600 mt-1">
           <template v-if="isAdminEdit">
-            Compte (email, plan, rôle) et profil santé — IMC calculé automatiquement
+            Compte (email, plan, rôle) et profil santé - IMC calculé automatiquement
           </template>
           <template v-else>
             Complétez vos informations - l'IMC est calculé automatiquement
@@ -166,7 +166,7 @@
 
         <!-- Masse grasse -->
         <div>
-          <label class="label" for="bodyfat">Masse grasse (%)<span class="text-slate-400 font-normal"> — optionnel</span></label>
+          <label class="label" for="bodyfat">Masse grasse (%)<span class="text-slate-400 font-normal"> - optionnel</span></label>
           <input id="bodyfat" v-model.number="form.body_fat_pct" type="number" min="0" max="100" step="0.1" class="input" placeholder="ex. 22" />
         </div>
 
@@ -195,7 +195,7 @@
           <p class="text-xs text-slate-500">Basé sur le poids et la taille</p>
         </div>
         <div class="text-right">
-          <p class="text-2xl font-bold" :class="bmiColor">{{ bmi ?? '—' }}</p>
+          <p class="text-2xl font-bold" :class="bmiColor">{{ bmi ?? '-' }}</p>
           <p v-if="bmiCategory" class="text-xs text-slate-600">{{ bmiCategory }}</p>
         </div>
       </div>

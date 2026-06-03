@@ -15,11 +15,11 @@ import { resolvePostAuthRoute } from '@/router/redirect'
 import { updateTransition } from '@/router/transition'
 
 const routes = [
-  // — Auth (accessible uniquement aux visiteurs non connectés) —
+  // - Auth (accessible uniquement aux visiteurs non connectés) -
   { path: '/login',    name: 'Login',    component: LoginView,    meta: { guestOnly: true, public: true } },
   { path: '/register', name: 'Register', component: RegisterView, meta: { guestOnly: true, public: true } },
 
-  // — Espace utilisateur (connecté) —
+  // - Espace utilisateur (connecté) -
   { path: '/dashboard/:userId',           name: 'Dashboard',     component: DashboardView, meta: { requiresAuth: true } },
   { path: '/dashboard/:userId/nutrition', name: 'Nutrition',     component: NutritionView, meta: { requiresAuth: true } },
   { path: '/dashboard/:userId/workout',   name: 'Workout',       component: WorkoutView,   meta: { requiresAuth: true } },
@@ -28,7 +28,7 @@ const routes = [
   { path: '/exercises',                   name: 'Exercises',     component: ExercisesView, meta: { requiresAuth: true } },
   { path: '/no-profile',                  name: 'NoProfile',     component: NoProfileView, meta: { requiresAuth: true } },
 
-  // — Back-office admin (connecté + rôle admin) —
+  // - Back-office admin (connecté + rôle admin) -
   { path: '/admin',                             name: 'AdminUsers',      component: TrendsUsersView, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/users/new',                   name: 'AdminUserCreate', component: AdminUserCreateView, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId',           name: 'AdminDashboard',  component: DashboardView,   meta: { requiresAuth: true, requiresAdmin: true } },
@@ -37,10 +37,10 @@ const routes = [
   { path: '/admin/dashboard/:userId/workout',   name: 'AdminWorkout',    component: WorkoutView,     meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/admin/dashboard/:userId/profile',  name: 'AdminProfile',    component: ProfileEditView, meta: { requiresAuth: true, requiresAdmin: true } },
 
-  // — Racine : redirige selon l'état d'authentification (géré dans le guard) —
+  // - Racine : redirige selon l'état d'authentification (géré dans le guard) -
   { path: '/', name: 'Root', redirect: () => '/login' },
 
-  // — Fallback —
+  // - Fallback -
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

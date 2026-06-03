@@ -51,9 +51,9 @@ const showStar = computed(() =>
 const title = computed(() => {
   if (props.role === 'admin') return 'Compte administrateur'
   if (props.role === 'demo') return 'Compte démonstration'
-  if (props.plan === 'premium') return 'Offre Premium — 9,99 €/mois'
-  if (props.plan === 'premium_plus') return 'Offre Premium+ — 19,99 €/mois'
-  return 'Offre gratuite — fonctionnalités de base'
+  if (props.plan === 'premium') return 'Offre Premium - 9,99 €/mois'
+  if (props.plan === 'premium_plus') return 'Offre Premium+ - 19,99 €/mois'
+  return 'Offre gratuite - fonctionnalités de base'
 })
 </script>
 

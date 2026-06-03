@@ -4,7 +4,7 @@
       <div>
         <h1 class="text-3xl font-bold text-brand-primary">Nouvel utilisateur</h1>
         <p class="text-slate-600 mt-1">
-          Créez le compte (prénom, nom, email) — le profil santé se complète ensuite, comme après une inscription
+          Créez le compte (prénom, nom, email) - le profil santé se complète ensuite, comme après une inscription
         </p>
       </div>
       <RouterLink to="/admin" class="btn-secondary">Retour</RouterLink>

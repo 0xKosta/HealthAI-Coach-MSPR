@@ -43,7 +43,7 @@ export function hasInvalidProfileData(user) {
   return getProfileIssues(user).length > 0
 }
 
-/** Profil incomplet ou données biométriques invalides — bloque coach / analyses IA. */
+/** Profil incomplet ou données biométriques invalides - bloque coach / analyses IA. */
 export function blocksAiFeatures(user) {
   if (!user) return true
   return isProfileIncomplete(user) || hasInvalidProfileData(user)

@@ -197,10 +197,10 @@ const goalLabels = {
 
 const daysLabel = computed(() => {
   const d = form.value.daysPerWeek
-  if (d <= 2) return 'Débutant — récupération optimale'
-  if (d <= 4) return 'Intermédiaire — bon équilibre'
-  if (d <= 5) return 'Avancé — haute fréquence'
-  return 'Expert — programme intensif'
+  if (d <= 2) return 'Débutant - récupération optimale'
+  if (d <= 4) return 'Intermédiaire - bon équilibre'
+  if (d <= 5) return 'Avancé - haute fréquence'
+  return 'Expert - programme intensif'
 })
 
 async function generatePlan() {

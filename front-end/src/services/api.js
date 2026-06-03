@@ -34,7 +34,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
-  // /auth/login attend un form OAuth2 (username = email) — pas du JSON
+  // /auth/login attend un form OAuth2 (username = email) - pas du JSON
   login: (email, password) => {
     const form = new URLSearchParams()
     form.append('username', email)
@@ -48,7 +48,7 @@ export const authAPI = {
   // Profil santé (table users) lié au compte connecté
   getProfile: () => api.get('/auth/me/profile'),
   updateProfile: (data) => api.put('/auth/me/profile', data),
-  // Suppression définitive du compte (RGPD — droit à l'effacement)
+  // Suppression définitive du compte (RGPD - droit à l'effacement)
   deleteAccount: () => api.delete('/auth/me'),
   adminCreateUser: (data) => api.post('/auth/admin/users', data),
   adminUpdateAccount: (profileUserId, data) =>

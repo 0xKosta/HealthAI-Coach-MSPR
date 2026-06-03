@@ -1,4 +1,4 @@
-# HealthAI Coach — Frontend
+# HealthAI Coach - Frontend
 
 Interface web du projet **HealthAI Coach**, développée avec Vue 3, Vite et Tailwind CSS.  
 Elle consomme l'API FastAPI disponible sur `http://localhost:8000`.
@@ -43,16 +43,16 @@ npm install
 
 | Commande | Description |
 |---|---|
-| `npm run dev` | Serveur de développement — `http://localhost:3000` |
+| `npm run dev` | Serveur de développement - `http://localhost:3000` |
 | `npm run build` | Build de production (génère `dist/`) |
-| `npm run preview` | Prévisualise le build de prod — `http://localhost:4173` |
+| `npm run preview` | Prévisualise le build de prod - `http://localhost:4173` |
 
 > **Important :** le Service Worker PWA est **désactivé en mode `dev`** par conception (Vite).  
 > Pour tester la PWA (installation, cache offline), utiliser `npm run build && npm run preview`.
 
 ---
 
-## PWA — Progressive Web App
+## PWA - Progressive Web App
 
 L'application est une PWA complète, installable sur desktop et mobile.
 
@@ -62,7 +62,7 @@ L'application est une PWA complète, installable sur desktop et mobile.
 |---|---|
 | Manifest | Nom, short name, description, icônes, `display: standalone`, `theme_color` |
 | Service Worker | Généré par Workbox via `vite-plugin-pwa` |
-| Cache statique | HTML, CSS, JS, images — précachés au premier chargement |
+| Cache statique | HTML, CSS, JS, images - précachés au premier chargement |
 | Cache API | Stratégie `NetworkFirst` sur `/api/` (TTL 5 min, 50 entrées max) |
 | Icônes | 192×192 et 512×512 (générées via [realfavicongenerator.net](https://realfavicongenerator.net)) |
 | Support iOS | `apple-touch-icon`, balises meta `apple-mobile-web-app-*` |
@@ -83,7 +83,7 @@ Le bouton d'installation apparaît dans la barre d'adresse Chrome une fois la PW
 ### Fonctionnement en production
 
 Le build est à effectuer **une seule fois** par déploiement (ou à chaque modification du code).  
-Le Service Worker persiste dans le navigateur et gère le cache automatiquement — aucune commande à relancer côté utilisateur.
+Le Service Worker persiste dans le navigateur et gère le cache automatiquement - aucune commande à relancer côté utilisateur.
 
 ---
 
@@ -121,9 +121,9 @@ front-end/
 │   ├── services/
 │   │   └── api.js               # Tous les appels axios (users, coach, metrics…)
 │   ├── stores/
-│   │   └── userStore.js         # Store Pinia — utilisateur sélectionné
+│   │   └── userStore.js         # Store Pinia - utilisateur sélectionné
 │   ├── views/
-│   │   ├── DashboardView.vue    # Page principale — profil + conseil IA
+│   │   ├── DashboardView.vue    # Page principale - profil + conseil IA
 │   │   ├── NutritionView.vue    # Analyse photo repas (vision IA)
 │   │   ├── WorkoutView.vue      # Génération programme d'entraînement
 │   │   ├── ExercisesView.vue    # Catalogue d'exercices
@@ -141,29 +141,29 @@ front-end/
 
 ## Pages
 
-### `/dashboard/:userId` — Dashboard
+### `/dashboard/:userId` - Dashboard
 - Carte profil : âge, IMC, poids, taille, masse grasse
 - **Profil incomplet ou invalide** : bandeau d'accueil / correction avec liste des erreurs, stats et IA verrouillés
 - Indicateurs rapides et conseil IA disponibles uniquement si `blocksAiFeatures(user)` est faux
 - Bouton **« Obtenir un conseil IA »** → `POST /coach/advice` (refusé côté API si profil non conforme)
 
-### `/dashboard/:userId/nutrition` — Analyse nutritionnelle
+### `/dashboard/:userId/nutrition` - Analyse nutritionnelle
 - `ProfileAiGate` si profil incomplet ou biométrie hors limites
 - Upload d'image → `POST /coach/analyze-photo`
 
-### `/dashboard/:userId/workout` — Programme d'entraînement
+### `/dashboard/:userId/workout` - Programme d'entraînement
 - `ProfileAiGate` si profil non prêt pour l'IA
 - Génération via `POST /coach/workout-plan`
 
-### `/dashboard/:userId/profile` — Édition profil santé
+### `/dashboard/:userId/profile` - Édition profil santé
 - Validation temps réel (âge 18–100, taille 90–230 cm, poids 20–300 kg, IMC 10–80)
 - Erreurs par champ + blocage à l'envoi ; affichage des `profile_issues` retournés par l'API
 
-### `/exercises` — Catalogue d'exercices
+### `/exercises` - Catalogue d'exercices
 - Consultation du catalogue complet via `GET /exercises`
 
-### `/dashboard/:userId/trends` — Tendances biométriques
-- KPIs et graphiques (30 jours) — données `GET /metrics/`
+### `/dashboard/:userId/trends` - Tendances biométriques
+- KPIs et graphiques (30 jours) - données `GET /metrics/`
 - Analyse IA verrouillée si profil incomplet/invalide ; sinon `POST /coach/biometric-trend` après 7 jours de données
 
 ---
@@ -184,7 +184,7 @@ Palette définie dans `tailwind.config.js` :
 | `brand-warning` | `#F59E0B` | Alertes non bloquantes |
 | `brand-error` | `#DC2626` | Erreurs, états critiques |
 
-Typographie : **Inter** (400 / 600 / 700) — chargée via Google Fonts.
+Typographie : **Inter** (400 / 600 / 700) - chargée via Google Fonts.
 
 ---
 
@@ -210,7 +210,7 @@ Règles biométriques et verrouillage IA : [`../docs/validation-biometrique.md`]
 ## Conventions de développement
 
 - **Composition API** avec `<script setup>` sur tous les composants
-- Appels API **centralisés** dans `src/services/api.js` — ne pas appeler axios directement dans les vues
+- Appels API **centralisés** dans `src/services/api.js` - ne pas appeler axios directement dans les vues
 - Chaque appel API gère ses états **loading** et **error** localement
 - Les classes CSS réutilisables sont définies dans `main.css` (`.card`, `.btn-primary`, `.input`…)
 - Aucune logique métier dans les composants UI (`ui/`)

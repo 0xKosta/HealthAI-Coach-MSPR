@@ -52,7 +52,7 @@
           type="button"
           class="view-btn"
           :class="viewMode === 'grid' ? 'view-btn--active' : ''"
-          title="Vue grille — 9 profils par page"
+          title="Vue grille - 9 profils par page"
           @click="setViewMode('grid')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -62,7 +62,7 @@
           type="button"
           class="view-btn"
           :class="viewMode === 'list' ? 'view-btn--active' : ''"
-          title="Vue liste — 50 profils par page"
+          title="Vue liste - 50 profils par page"
           @click="setViewMode('list')"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
@@ -223,7 +223,7 @@
               </p>
             </div>
             <p class="text-sm text-slate-500 truncate">
-              {{ user.gender ? genderLabel(user.gender) : '—' }}
+              {{ user.gender ? genderLabel(user.gender) : '-' }}
             </p>
             <p class="text-sm text-slate-600 truncate">
               {{ goalLabel(user.goal) }}
@@ -234,7 +234,7 @@
                 :plan="user.plan"
                 :role="user.role || 'user'"
               />
-              <span v-else class="text-xs text-slate-400">—</span>
+              <span v-else class="text-xs text-slate-400">-</span>
             </div>
             <p class="text-sm text-slate-500 tabular-nums">
               {{ formatCreatedAt(user.created_at) }}
@@ -488,7 +488,7 @@ function goalLabel(goal) {
 }
 
 function formatCreatedAt(dateStr) {
-  if (!dateStr) return '—'
+  if (!dateStr) return '-'
   return new Intl.DateTimeFormat('fr-FR', {
     day: '2-digit',
     month: '2-digit',
@@ -530,7 +530,7 @@ watch([search, filterPlan, filterDate], () => {
   @apply bg-brand-accent text-white hover:bg-brand-accent;
 }
 
-/* Cartes utilisateur — cover + avatar overlap (tendance admin 2025/26) */
+/* Cartes utilisateur - cover + avatar overlap (tendance admin 2025/26) */
 .user-card {
   @apply relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white text-left
          shadow-sm transition-all duration-300 ease-out

@@ -25,7 +25,7 @@ export function useAiGate(profileUser) {
         ? 'Analyse IA verrouillée'
         : 'Analyse IA verrouillée'
     }
-    if (planBlocksAi.value) return 'Coach IA — offre Premium'
+    if (planBlocksAi.value) return 'Coach IA - offre Premium'
     return ''
   })
 

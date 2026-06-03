@@ -9,7 +9,7 @@
         class="select pr-10 min-w-[200px] appearance-none"
       >
         <option v-for="user in users" :key="user.id" :value="user.id">
-          {{ formatProfileDisplayName(user) }} — {{ goalLabel(user.goal) }}
+          {{ formatProfileDisplayName(user) }} - {{ goalLabel(user.goal) }}
         </option>
       </select>
       <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"

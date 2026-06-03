@@ -100,10 +100,10 @@
               </span>
             </div>
             <p class="text-sm font-medium text-brand-primary truncate">
-              {{ row.input_summary || '—' }}
+              {{ row.input_summary || '-' }}
             </p>
             <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">
-              {{ row.output_summary || '—' }}
+              {{ row.output_summary || '-' }}
             </p>
           </div>
           <svg

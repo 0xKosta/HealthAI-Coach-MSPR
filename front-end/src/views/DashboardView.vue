@@ -135,8 +135,8 @@
       >
         <span class="material-symbols-outlined text-[22px] leading-none shrink-0 text-brand-warning">info</span>
         <div class="flex-1 min-w-0 text-sm font-medium">
-          <p v-if="hasInvalidProfile">Profil utilisateur invalide — analyses IA indisponibles.</p>
-          <p v-else>Profil utilisateur incomplet — métriques et conseil IA indisponibles.</p>
+          <p v-if="hasInvalidProfile">Profil utilisateur invalide - analyses IA indisponibles.</p>
+          <p v-else>Profil utilisateur incomplet - métriques et conseil IA indisponibles.</p>
           <ul v-if="profileIssues.length" class="mt-2 font-normal list-disc list-inside space-y-0.5">
             <li v-for="(issue, index) in profileIssues" :key="index">{{ issue }}</li>
           </ul>
@@ -177,19 +177,19 @@
 
           <div class="grid grid-cols-2 gap-3">
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ user.age ?? '—' }}</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ user.age ?? '-' }}</p>
               <p class="text-xs text-slate-600">ans</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold" :class="bmiColor">{{ user.bmi != null ? user.bmi.toFixed(1) : '—' }}</p>
+              <p class="text-2xl font-bold" :class="bmiColor">{{ user.bmi != null ? user.bmi.toFixed(1) : '-' }}</p>
               <p class="text-xs text-slate-600">IMC</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ user.weight_kg != null ? `${user.weight_kg} kg` : '—' }}</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ user.weight_kg != null ? `${user.weight_kg} kg` : '-' }}</p>
               <p class="text-xs text-slate-600">Poids</p>
             </div>
             <div class="bg-white rounded-xl p-3 text-center border border-slate-100">
-              <p class="text-2xl font-bold text-brand-primary">{{ user.height_cm != null ? `${(user.height_cm / 100).toFixed(2)} m` : '—' }}</p>
+              <p class="text-2xl font-bold text-brand-primary">{{ user.height_cm != null ? `${(user.height_cm / 100).toFixed(2)} m` : '-' }}</p>
               <p class="text-xs text-slate-600">Taille</p>
             </div>
           </div>
@@ -252,7 +252,7 @@
           </div>
           <h3 class="text-lg font-bold text-brand-primary">Vos indicateurs apparaîtront ici</h3>
           <p class="text-sm text-slate-600 mt-2 max-w-sm">
-            Score santé, IMC et suivi personnalisé — disponibles dès que le profil est complété.
+            Score santé, IMC et suivi personnalisé - disponibles dès que le profil est complété.
           </p>
           <RouterLink v-if="activeUserId" :to="profileEditPath" class="btn-secondary mt-5">
             Compléter le profil
@@ -539,8 +539,8 @@ const goalLabels = {
 }
 const genderLabels = { male: 'Homme', female: 'Femme', other: 'Autre' }
 
-const goalLabel   = computed(() => goalLabels[user.value?.goal] || user.value?.goal || '—')
-const genderLabel = computed(() => genderLabels[user.value?.gender] || user.value?.gender || '—')
+const goalLabel   = computed(() => goalLabels[user.value?.goal] || user.value?.goal || '-')
+const genderLabel = computed(() => genderLabels[user.value?.gender] || user.value?.gender || '-')
 
 const goalBadgeClass = computed(() => ({
   weight_loss: 'badge-accent', muscle_gain: 'badge-success',
@@ -571,7 +571,7 @@ const bmiIconColor = computed(() => {
 })
 const bmiCategory = computed(() => {
   const b = user.value?.bmi
-  if (!b) return '—'
+  if (!b) return '-'
   if (b < 18.5) return 'Insuffisant'
   if (b < 25)   return 'Normal'
   if (b < 30)   return 'Surpoids'
@@ -579,11 +579,11 @@ const bmiCategory = computed(() => {
 })
 const bmiSubLabel = computed(() => {
   const b = user.value?.bmi
-  return b != null ? `${b.toFixed(1)} kg/m²` : '—'
+  return b != null ? `${b.toFixed(1)} kg/m²` : '-'
 })
 const healthScore = computed(() => {
   const u = user.value
-  if (!u?.bmi) return '—'
+  if (!u?.bmi) return '-'
   let s = 50
   const b = u.bmi
   if (b >= 18.5 && b < 25) s += 30

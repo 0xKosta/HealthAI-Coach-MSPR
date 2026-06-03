@@ -1,10 +1,10 @@
 <template>
-  <!-- Navbar principale — fond #08104D (bleu nuit, zones structurantes) -->
+  <!-- Navbar principale - fond #08104D (bleu nuit, zones structurantes) -->
   <nav class="fixed top-0 inset-x-0 z-50 bg-brand-primary border-b border-brand-secondary/50 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="relative flex items-center h-20 sm:h-16 w-full">
 
-        <!-- Logo — aligné à gauche -->
+        <!-- Logo - aligné à gauche -->
         <RouterLink
           :to="homeLink"
           class="flex items-center"

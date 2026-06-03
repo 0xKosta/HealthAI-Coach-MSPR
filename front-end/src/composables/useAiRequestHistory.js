@@ -16,7 +16,7 @@ export const REQUEST_TYPE_LABELS = {
 }
 
 export function formatAiRequestDate(iso) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Intl.DateTimeFormat('fr-FR', {
       dateStyle: 'short',

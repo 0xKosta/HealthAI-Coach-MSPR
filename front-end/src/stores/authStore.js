@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => currentUser.value?.role === 'admin')
   const canUseAi = computed(() => !!currentUser.value?.can_use_ai)
   const plan = computed(() => currentUser.value?.plan ?? 'free')
-  // Profil santé lié (users.id) — cible du dashboard utilisateur
+  // Profil santé lié (users.id) - cible du dashboard utilisateur
   const profileId = computed(() => currentUser.value?.user_id ?? null)
 
   function setToken(value) {

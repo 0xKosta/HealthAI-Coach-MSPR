@@ -106,7 +106,7 @@
                 </svg>
               </div>
               <p class="text-brand-text font-medium">Glissez une image ici ou cliquez pour parcourir</p>
-              <p class="text-slate-600 text-sm mt-1">JPG, PNG, WebP — max 10 Mo</p>
+              <p class="text-slate-600 text-sm mt-1">JPG, PNG, WebP - max 10 Mo</p>
             </div>
 
             <div v-else class="relative flex items-center justify-center min-h-[280px] max-h-[28rem] p-6 bg-slate-50/80 rounded-xl overflow-hidden">
@@ -254,7 +254,7 @@
               </button>
             </span>
           </div>
-          <p v-else class="text-sm text-slate-500 mt-4">Aucune allergie renseignée — le plan inclura toutes les familles d'aliments.</p>
+          <p v-else class="text-sm text-slate-500 mt-4">Aucune allergie renseignée - le plan inclura toutes les familles d'aliments.</p>
 
           <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p class="text-sm text-slate-600">
@@ -608,7 +608,7 @@ const MacroCard = defineComponent({
   props: { label: String, value: [String, Number], unit: String, color: String, bg: String },
   setup(props) {
     return () => h('div', { class: `rounded-xl p-4 text-center border border-slate-100 ${props.bg}` }, [
-      h('p', { class: `text-2xl font-bold ${props.color}` }, props.value ?? '—'),
+      h('p', { class: `text-2xl font-bold ${props.color}` }, props.value ?? '-'),
       h('p', { class: 'text-xs text-slate-600 mt-0.5' }, `${props.label} (${props.unit})`),
     ])
   },
