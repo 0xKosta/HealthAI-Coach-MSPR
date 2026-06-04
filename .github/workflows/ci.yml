@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OPENAI_API_KEY: pytest-ci-dummy-key
-      DATABASE_URL: sqlite:///:memory:
+      DATABASE_URL: "sqlite:///:memory:"
     steps:
       - uses: actions/checkout@v4
 
