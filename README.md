@@ -331,6 +331,8 @@ Permet de passer d’autres comptes en `premium` / `premium_plus` via l’interf
 
 Documentation : [`docs/deploiement.md`](docs/deploiement.md), [`docs/monitoring.md`](docs/monitoring.md), [`docs/ci-cd.md`](docs/ci-cd.md).
 
+**Référence rapide démo (ports, modes dev/preview/Docker, Grafana) :** [`docs/reference-demo.md`](docs/reference-demo.md).
+
 ---
 
 ## Lancer le pipeline ETL

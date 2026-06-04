@@ -1,5 +1,7 @@
 # Checklist démo orale — 11 juin
 
+> **Ports, comptes, Grafana/Prometheus :** [`reference-demo.md`](reference-demo.md)
+
 ## Avant le jour J
 
 - [ ] `docker compose --profile full up -d --build` testé sur la machine de présentation
