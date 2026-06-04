@@ -9,7 +9,7 @@ def test_admin_delete_user_with_linked_account(client, admin_auth_headers):
     reg = client.post(
         "/auth/register",
         json={
-            "email": "todelete.by.admin@test.local",
+            "email": "todelete.by.admin@healthai-coach.demo",
             "password": "testpass12",
             "first_name": "To",
             "last_name": "Delete",
@@ -20,7 +20,7 @@ def test_admin_delete_user_with_linked_account(client, admin_auth_headers):
     db = TestingSessionLocal()
     account = (
         db.query(UserAuth)
-        .filter(UserAuth.email == "todelete.by.admin@test.local")
+        .filter(UserAuth.email == "todelete.by.admin@healthai-coach.demo")
         .first()
     )
     profile_id = account.user_id
@@ -33,26 +33,44 @@ def test_admin_delete_user_with_linked_account(client, admin_auth_headers):
     assert db.query(User).filter(User.id == profile_id).first() is None
     assert (
         db.query(UserAuth)
-        .filter(UserAuth.email == "todelete.by.admin@test.local")
+        .filter(UserAuth.email == "todelete.by.admin@healthai-coach.demo")
         .first()
         is None
     )
     db.close()
 
 
-def test_delete_my_account_with_profile(client, premium_auth_headers, created_user):
-    """Suppression : user_auth puis profil users (évite user_id NULL)."""
+def test_delete_my_account_with_profile(client):
+    """Suppression : user_auth puis profil users (évite user_id NULL).
+
+    Compte dédié (inscription) pour ne pas supprimer le created_user de session
+    utilisé par les autres tests.
+    """
     from api.models import User, UserAuth
     from tests.conftest import TestingSessionLocal
 
-    res = client.delete("/auth/me", headers=premium_auth_headers)
+    email = "delete.self@healthai-coach.demo"
+    reg = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "testpass12",
+            "first_name": "Self",
+            "last_name": "Delete",
+        },
+    )
+    assert reg.status_code == 201
+    headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
+
+    db = TestingSessionLocal()
+    account = db.query(UserAuth).filter(UserAuth.email == email).first()
+    profile_id = account.user_id
+    db.close()
+
+    res = client.delete("/auth/me", headers=headers)
     assert res.status_code == 204
 
     db = TestingSessionLocal()
-    profile_id = created_user["id"]
     assert db.query(User).filter(User.id == profile_id).first() is None
-    assert (
-        db.query(UserAuth).filter(UserAuth.email == "premium.coach@test.local").first()
-        is None
-    )
+    assert db.query(UserAuth).filter(UserAuth.email == email).first() is None
     db.close()
