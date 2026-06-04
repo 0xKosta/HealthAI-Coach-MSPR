@@ -10,6 +10,7 @@ import RegisterView from '@/views/RegisterView.vue'
 import NoProfileView from '@/views/NoProfileView.vue'
 import ProfileEditView from '@/views/ProfileEditView.vue'
 import AdminUserCreateView from '@/views/AdminUserCreateView.vue'
+import FeedView from '@/views/FeedView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { resolvePostAuthRoute } from '@/router/redirect'
 import { updateTransition } from '@/router/transition'
@@ -25,6 +26,7 @@ const routes = [
   { path: '/dashboard/:userId/workout',   name: 'Workout',       component: WorkoutView,   meta: { requiresAuth: true } },
   { path: '/dashboard/:userId/trends',    name: 'Trends',        component: TrendsView,    meta: { requiresAuth: true } },
   { path: '/dashboard/:userId/profile',   name: 'Profile',       component: ProfileEditView, meta: { requiresAuth: true } },
+  { path: '/dashboard/:userId/feed',     name: 'Feed',          component: FeedView,        meta: { requiresAuth: true } },
   { path: '/exercises',                   name: 'Exercises',     component: ExercisesView, meta: { requiresAuth: true } },
   { path: '/no-profile',                  name: 'NoProfile',     component: NoProfileView, meta: { requiresAuth: true } },
 

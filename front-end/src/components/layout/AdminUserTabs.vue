@@ -22,6 +22,7 @@
       :class="i === activeIndex ? 'w-6 bg-brand-accent' : 'w-2 bg-slate-300'"
       :aria-label="`Aller à ${tab.label}`"
       @click="goTo(i)"
+      @pointerdown.stop
     ></button>
   </div>
 </template>

@@ -149,7 +149,7 @@ class MeResponse(BaseModel):
     email: str
     first_name: str
     last_name: str
-    avatar_url: str | None
+    avatar_url: str | None = None
     user_id: int | None  # Profil santé lié (users.id) — null si compte sans profil
     role: str  # user | admin | demo
     plan: str  # free | premium | premium_plus
@@ -203,6 +203,7 @@ def _create_account_with_empty_profile(
             password_hash=hash_password(password),
             first_name=first_name,
             last_name=last_name,
+            avatar_url=None,
             role=role,
             plan=plan,
         )
@@ -385,7 +386,7 @@ class UserAuthPublic(BaseModel):
     email: str
     first_name: str
     last_name: str
-    avatar_url: str | None
+    avatar_url: str | None = None
     # Données du profil santé lié (peut être null si pas de lien)
     user_id: int | None
     user_goal: str | None
@@ -395,7 +396,7 @@ class UserAuthPublic(BaseModel):
 class UpdateMeRequest(BaseModel):
     first_name: str | None = Field(None, min_length=1, max_length=50)
     last_name: str | None = Field(None, min_length=1, max_length=50)
-    avatar_url: str | None = None
+    avatar_url: str | None = Field(None, max_length=2048)
 
 
 # =============================================================================
@@ -472,7 +473,7 @@ def update_me(
     if payload.last_name is not None:
         current_user.last_name = payload.last_name
     if payload.avatar_url is not None:
-        current_user.avatar_url = payload.avatar_url
+        current_user.avatar_url = payload.avatar_url.strip() or None
 
     db.commit()
     db.refresh(current_user)
@@ -559,23 +560,28 @@ def delete_my_account(
 ):
     """Suppression totale et définitive du compte de l'utilisateur connecté.
 
-    Conforme au droit à l'effacement (art. 17 RGPD). Supprimer la ligne `users`
-    liée déclenche, via les contraintes ON DELETE CASCADE, l'effacement de
-    toutes les données associées : compte d'authentification (user_auth),
-    profil santé, métriques biométriques, séances d'entraînement (et exercices
-    de séance), journaux alimentaires et publications.
-    Si aucun profil santé n'est lié, seul le compte user_auth est supprimé.
+    Conforme au droit à l'effacement (art. 17 RGPD).
+    Ordre : user_auth d'abord (posts, likes, commentaires en CASCADE),
+    puis le profil users (métriques, nutrition, séances, historique IA).
+    La FK user_auth → users est en RESTRICT (migration 002) : on ne peut pas
+    supprimer users tant que user_auth existe.
     """
+    profile_id = current_user.user_id
     try:
-        if current_user.user_id:
-            profile = db.query(User).filter(User.id == current_user.user_id).first()
-            # La suppression du profil parent cascade jusqu'à user_auth.
-            db.delete(profile if profile else current_user)
-        else:
-            db.delete(current_user)
+        db.delete(current_user)
+        db.flush()
+
+        if profile_id:
+            profile = db.query(User).filter(User.id == profile_id).first()
+            if profile:
+                db.delete(profile)
+
         db.commit()
     except Exception:
         db.rollback()
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Impossible de supprimer le compte. Réessayez ou contactez le support.",
+        )
 
     return None

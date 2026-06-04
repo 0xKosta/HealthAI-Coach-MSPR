@@ -194,16 +194,34 @@ def run_session_exercises(engine, log):
 
 
 def run_biometric_metrics(engine, log):
-    """Données simulées : historique temporel absent du dataset, on génère
-    SIM_BIOMETRIC_DAYS jours par user."""
+    """Données simulées pour les profils issus du dataset Gym uniquement.
+
+    Les comptes créés via l'app (user_auth / inscription) n'ont en général
+    pas de workout_sessions : on ne leur injecte plus de métriques fictives.
+    """
     with engine.connect() as conn:
         users = pd.read_sql(
-            text("SELECT id, name, weight_kg FROM users ORDER BY id"),
+            text(
+                """
+                SELECT DISTINCT u.id, u.name, u.weight_kg
+                FROM users u
+                INNER JOIN workout_sessions ws ON ws.user_id = u.id
+                ORDER BY u.id
+                """
+            ),
             conn,
+        )
+        total_users = conn.execute(text("SELECT COUNT(*) FROM users")).scalar_one()
+        skipped = int(total_users) - len(users)
+
+    if skipped > 0:
+        log.info(
+            f"biometric_metrics : {skipped} profil(s) sans séance Gym "
+            f"(inscriptions récentes) — pas de simulation."
         )
 
     if users.empty:
-        log.info("aucun user, simulation biometric_metrics ignorée.")
+        log.info("aucun user éligible, simulation biometric_metrics ignorée.")
         return 0
 
     raw_gym = extract.extract_gym()

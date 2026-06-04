@@ -287,11 +287,49 @@ Micro-service FastAPI **séparé** de l'API principale — prédit le type d'ent
 |----------|-------------|
 | `GET /posts/` | Feed — liste des publications (anti-chronologique) 🔒 |
 | `POST /posts/` | Créer une publication (texte + média optionnel) 🔒 |
+| `POST /posts/{id}/like` | Aimer / retirer son like 🔒 |
+| `GET /posts/{id}/comments` | Liste des commentaires 🔒 |
+| `POST /posts/{id}/comments` | Ajouter un commentaire 🔒 |
 | `DELETE /posts/{id}` | Supprimer une publication (auteur uniquement) 🔒 |
+
+**Front PWA :** route `/dashboard/:userId/feed` (onglet **Communauté**). Voir [`docs/application-mobile-pwa.md`](docs/application-mobile-pwa.md).
+
+**Migration likes/commentaires :**
+
+```bash
+psql -h <host> -U <user> -d <dbname> -f db/migrations/007_post_likes_comments.sql
+```
 
 > 🔒 = endpoint protégé, nécessite un token JWT dans le header `Authorization: Bearer <token>`
 
-**Formats média acceptés :** JPEG, PNG, WebP, MP4 (max 50 Mo). Fichiers stockés dans `media/posts/`.
+**Formats média acceptés :** JPEG, PNG, WebP, MP4 (max 50 Mo). Fichiers stockés **localement** dans `media/posts/` (dossier ignoré par Git, comme `media/ai-photos/`). En production : stockage objet / serveur de fichiers à prévoir.
+
+---
+
+## MSPR3 — Démo Docker (une commande)
+
+```powershell
+.\scripts\demo-up.ps1          # profil complet + monitoring
+.\scripts\demo-up.ps1 -Offline # coach IA en mode mock
+```
+
+| Service | URL |
+|---------|-----|
+| PWA | http://localhost:8080 |
+| API | http://localhost:8000/docs |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3001 (admin / admin) |
+
+**Compte admin application (seed Docker uniquement, pas Supabase) :**
+
+| Champ | Valeur |
+|-------|--------|
+| Email | `admin@admin.com` |
+| Mot de passe | `admin` |
+
+Permet de passer d’autres comptes en `premium` / `premium_plus` via l’interface admin.
+
+Documentation : [`docs/deploiement.md`](docs/deploiement.md), [`docs/monitoring.md`](docs/monitoring.md), [`docs/ci-cd.md`](docs/ci-cd.md).
 
 ---
 
@@ -303,6 +341,8 @@ python -m etl.pipeline
 
 Le pipeline enchaîne : `extract` → `transform` → `load`. Il est **idempotent**.
 Si `user_auth` contient des lignes, le pipeline **préserve** la table `users`.
+
+Les métriques biométriques simulées (`biometric_metrics`) ne sont générées que pour les profils ayant au moins une séance Gym (`workout_sessions`) — pas pour les comptes créés via l'inscription.
 
 **Prérequis ETL :**
 ```env
@@ -389,7 +429,7 @@ api/
     ├── metrics.py       # CRUD /metrics + stats
     ├── coach.py         # IA /coach — advice, analyze-photo, workout-plan, biometric-trend, meal-plan
     ├── auth.py          # JWT /auth — register, login, me
-    └── posts.py         # Feed /posts — GET, POST, DELETE + upload média
+    └── posts.py         # Feed /posts — publications, likes, commentaires, médias
 
 front-end/
 ├── src/
@@ -421,6 +461,7 @@ db/
 ├── seed_auth.py         # 100 comptes démo user_auth (MSPR 3)
 └── migrations/
     ├── 001_user_auth_posts.sql
+    ├── 007_post_likes_comments.sql
     ├── 002_users_age_nullable.sql
     └── 004_users_biometric_checks.sql
 
@@ -466,4 +507,5 @@ Documentation complète dans [`docs/modele-donnees.md`](docs/modele-donnees.md).
 - Toujours travailler sur une branche dédiée, jamais directement sur `main`
 - Toute modification du schéma BDD doit passer par une migration dans `db/migrations/`
 - Après modification des endpoints, régénérer `docs/openapi.json` via `python export_openapi.py`
-- Les dossiers `media/` et `backups/` sont dans `.gitignore`
+- Les uploads **`media/posts/`** et **`media/ai-photos/`** ne doivent **jamais** être commités (`.gitkeep` seulement) — stockage serveur prévu plus tard
+- Le dossier `backups/` est dans `.gitignore`

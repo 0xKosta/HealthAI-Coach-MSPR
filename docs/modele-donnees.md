@@ -287,6 +287,8 @@ Un utilisateur peut avoir plusieurs seances dans le temps. Fusionner les deux en
 
 Le poids, le sommeil et la frequence cardiaque au repos sont des donnees **temporelles** : elles evoluent dans le temps et doivent etre trackees sous forme d'historique. Les stocker dans `users` permettrait uniquement la valeur actuelle. La table separee permet de tracer la progression sur le temps — indispensable pour les modules IA de prediction.
 
+L'ETL (`run_biometric_metrics`) ne simule l'historique que pour les utilisateurs ayant des `workout_sessions` (dataset Gym). Les comptes inscrits via l'app n'ont pas de courbe fictive injectee automatiquement.
+
 ### Pourquoi `session_exercises` comme table de liaison ?
 
 La relation entre `workout_sessions` et `exercises` est **N-N** : une seance contient plusieurs exercices, et un exercice peut apparaitre dans plusieurs seances. Une table de liaison est la seule facon correcte de modeliser une relation N-N en relationnel, tout en portant les attributs specifiques a chaque occurrence (sets, reps, duree).

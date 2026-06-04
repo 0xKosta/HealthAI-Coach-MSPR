@@ -91,6 +91,19 @@ Path("media").mkdir(exist_ok=True)
 Path("media/ai-photos").mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
+# Métriques Prometheus (/metrics) pour supervision MSPR3
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator().instrument(app).expose(
+        app,
+        endpoint="/metrics",
+        include_in_schema=False,
+    )
+except ImportError:
+    pass
+
+
 @app.get("/health", tags=["Santé"], summary="Vérifier l'état de l'API")
 def health_check():
     """

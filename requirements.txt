@@ -24,3 +24,6 @@ openai>=2.36.0
 
 #bcrypt - authentication
 python-jose[cryptography]>=3.3.0
+
+# Monitoring MSPR3
+prometheus-fastapi-instrumentator>=7.0.0

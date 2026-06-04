@@ -1,0 +1,6 @@
+# Surcharge mode offline — mocks OpenAI, pas d'appel externe requis
+services:
+  api:
+    environment:
+      OPENAI_MOCK: "true"
+      OPENAI_API_KEY: offline-demo

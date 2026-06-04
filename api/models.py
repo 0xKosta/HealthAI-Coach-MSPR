@@ -305,7 +305,7 @@ class UserAuth(Base):
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     first_name: Mapped[str] = mapped_column(String(50), nullable=False)
     last_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    avatar_url: Mapped[str | None] = mapped_column(Text, default=None)
+    avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     role: Mapped[str] = mapped_column(String(20), nullable=False, server_default="user")
     plan: Mapped[str] = mapped_column(String(20), nullable=False, server_default="free")
     created_at: Mapped[date] = mapped_column(
@@ -321,6 +321,12 @@ class UserAuth(Base):
     )
 
     posts: Mapped[list["Post"]] = relationship(
+        back_populates="author", cascade="all, delete-orphan"
+    )
+    post_likes: Mapped[list["PostLike"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    post_comments: Mapped[list["PostComment"]] = relationship(
         back_populates="author", cascade="all, delete-orphan"
     )
     
@@ -346,3 +352,48 @@ class Post(Base):
     updated_at: Mapped[datetime | None] = mapped_column(server_default=func.now())
 
     author: Mapped[UserAuth] = relationship(back_populates="posts")
+    likes: Mapped[list["PostLike"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan"
+    )
+    comments: Mapped[list["PostComment"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan"
+    )
+
+
+# =============================================================================
+# TABLE : post_likes
+# =============================================================================
+class PostLike(Base):
+    __tablename__ = "post_likes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user_auth.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime | None] = mapped_column(server_default=func.now())
+
+    post: Mapped["Post"] = relationship(back_populates="likes")
+    user: Mapped[UserAuth] = relationship(back_populates="post_likes")
+
+
+# =============================================================================
+# TABLE : post_comments
+# =============================================================================
+class PostComment(Base):
+    __tablename__ = "post_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False
+    )
+    author_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user_auth.id", ondelete="CASCADE"), nullable=False
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(server_default=func.now())
+
+    post: Mapped["Post"] = relationship(back_populates="comments")
+    author: Mapped[UserAuth] = relationship(back_populates="post_comments")

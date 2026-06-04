@@ -51,7 +51,9 @@ npm install
 npm test
 ```
 
-Couvre la logique métier UI critique (`useProfileCompletion`, détection panne réseau). Les parcours complets (login, nutrition) restent en recette manuelle / E2E prévus MSPR3.
+Couvre la logique métier UI critique (`useProfileCompletion`, détection panne réseau).
+
+**MSPR3 — Feed social (PWA)** : route `/dashboard/:userId/feed`, onglet **Communauté**, API `postsAPI` (publications, likes, commentaires). Installation PWA : `PwaInstallBanner.vue`. Doc : [`../docs/application-mobile-pwa.md`](../docs/application-mobile-pwa.md).
 
 ---
 

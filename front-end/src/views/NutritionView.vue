@@ -26,9 +26,10 @@
       <div
         v-if="!isAdminScope"
         class="nutrition-module-nav"
+        data-no-swipe
       >
         <p class="nutrition-module-nav__label">Module IA</p>
-        <div class="nutrition-tabs" role="tablist" aria-label="Modules nutrition">
+        <div class="nutrition-tabs" role="tablist" aria-label="Modules nutrition" data-no-swipe>
           <button
             type="button"
             role="tab"
@@ -36,6 +37,7 @@
             class="nutrition-tabs__btn"
             :class="{ 'nutrition-tabs__btn--active': activeTab === 'photo' }"
             @click="activeTab = 'photo'"
+            @pointerdown.stop
           >
             <span class="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">photo_camera</span>
             <span class="nutrition-tabs__text">Analyse photo</span>
@@ -47,6 +49,7 @@
             class="nutrition-tabs__btn"
             :class="{ 'nutrition-tabs__btn--active': activeTab === 'meal' }"
             @click="activeTab = 'meal'"
+            @pointerdown.stop
           >
             <span class="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">restaurant_menu</span>
             <span class="nutrition-tabs__text">Plan repas</span>
@@ -94,6 +97,7 @@
 
           <div
             class="relative border-2 border-dashed rounded-2xl transition-all duration-200 cursor-pointer"
+            data-no-swipe
             :class="dragOver
               ? 'border-brand-accent bg-brand-accent/5'
               : 'border-slate-200 hover:border-brand-accent/50 hover:bg-brand-light'"
@@ -101,6 +105,7 @@
             @dragleave="dragOver = false"
             @drop.prevent="handleDrop"
             @click="fileInput?.click()"
+            @pointerdown.stop
           >
             <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" @change="handleFileChange" />
 
@@ -710,6 +715,7 @@ watch(() => route.fullPath, async (path, prev) => {
   font-weight: 600;
   color: #64748b;
   transition: background 0.15s, color 0.15s;
+  touch-action: manipulation;
 }
 
 @media (min-width: 640px) {

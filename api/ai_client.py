@@ -1,13 +1,25 @@
 # api/ai_client.py
-# Client OpenAI centralisé — instancié une seule fois, importé partout
+# Client OpenAI centralisé — mode mock pour démo offline (OPENAI_MOCK=true)
+
 import os
-from openai import OpenAI
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-_api_key = os.getenv("OPENAI_API_KEY")
-if not _api_key:
-    raise ValueError("OPENAI_API_KEY est absente du fichier .env")
+MOCK_MODE = os.getenv("OPENAI_MOCK", "").strip().lower() in ("1", "true", "yes")
+_api_key = os.getenv("OPENAI_API_KEY", "").strip()
 
-client = OpenAI(api_key=_api_key)
+client = None
+
+if MOCK_MODE:
+    client = None
+elif not _api_key:
+    raise ValueError(
+        "OPENAI_API_KEY est absente du fichier .env "
+        "(ou activez OPENAI_MOCK=true pour la démo hors ligne)."
+    )
+else:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=_api_key)

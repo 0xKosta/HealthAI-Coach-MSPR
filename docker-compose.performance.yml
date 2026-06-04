@@ -1,0 +1,11 @@
+# Surcharge mode performance — stack allégée (monitoring désactivé via profil)
+# Lancer : docker compose -f docker-compose.yml -f docker-compose.performance.yml --profile performance up -d
+
+services:
+  api:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+  db:
+    command: postgres -c shared_buffers=64MB -c max_connections=20

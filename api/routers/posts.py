@@ -1,17 +1,17 @@
 # api/routers/posts.py
-# Feed social — GET / POST / DELETE
-# Préfixe monté dans main.py : /posts
+# Feed social — publications, likes, commentaires
 
 import logging
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.database import get_db
-from api.models import Post, UserAuth
+from api.models import Post, PostComment, PostLike, UserAuth
 from api.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -29,19 +29,18 @@ ALLOWED_TYPES = {
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 Mo
 
 
-# =============================================================================
-# SCHÉMAS
-# =============================================================================
-
 class PostResponse(BaseModel):
     id: int
     author_id: int
     first_name: str
     last_name: str
-    avatar_url: str | None
+    avatar_url: str | None = None
     content: str | None
     media_url: str | None
     media_type: str | None
+    like_count: int = 0
+    comment_count: int = 0
+    liked_by_me: bool = False
     created_at: str
     updated_at: str | None
 
@@ -49,9 +48,67 @@ class PostResponse(BaseModel):
         from_attributes = True
 
 
-# =============================================================================
-# ENDPOINTS
-# =============================================================================
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class CommentResponse(BaseModel):
+    id: int
+    post_id: int
+    author_id: int
+    first_name: str
+    last_name: str
+    avatar_url: str | None = None
+    content: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class LikeToggleResponse(BaseModel):
+    post_id: int
+    liked: bool
+    like_count: int
+
+
+def _post_to_response(post: Post, current_user_id: int, db: Session) -> PostResponse:
+    like_count = (
+        db.query(func.count(PostLike.id)).filter(PostLike.post_id == post.id).scalar() or 0
+    )
+    comment_count = (
+        db.query(func.count(PostComment.id)).filter(PostComment.post_id == post.id).scalar()
+        or 0
+    )
+    liked_by_me = (
+        db.query(PostLike.id)
+        .filter(PostLike.post_id == post.id, PostLike.user_id == current_user_id)
+        .first()
+        is not None
+    )
+    return PostResponse(
+        id=post.id,
+        author_id=post.author_id,
+        first_name=post.author.first_name,
+        last_name=post.author.last_name,
+        avatar_url=post.author.avatar_url,
+        content=post.content,
+        media_url=post.media_url,
+        media_type=post.media_type,
+        like_count=like_count,
+        comment_count=comment_count,
+        liked_by_me=liked_by_me,
+        created_at=str(post.created_at),
+        updated_at=str(post.updated_at) if post.updated_at else None,
+    )
+
+
+def _get_post_or_404(post_id: int, db: Session) -> Post:
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post introuvable.")
+    return post
+
 
 @router.get(
     "/",
@@ -72,22 +129,7 @@ def get_feed(
         .limit(limit)
         .all()
     )
-
-    return [
-        PostResponse(
-            id=p.id,
-            author_id=p.author_id,
-            first_name=p.author.first_name,
-            last_name=p.author.last_name,
-            avatar_url=p.author.avatar_url,
-            content=p.content,
-            media_url=p.media_url,
-            media_type=p.media_type,
-            created_at=str(p.created_at),
-            updated_at=str(p.updated_at) if p.updated_at else None,
-        )
-        for p in posts
-    ]
+    return [_post_to_response(p, current_user.id, db) for p in posts]
 
 
 @router.post(
@@ -118,7 +160,6 @@ async def create_post(
                 detail=f"Type non supporté : {media.content_type}. Acceptés : JPEG, PNG, WebP, MP4.",
             )
 
-        # ⚠️ Variable renommée 'raw_bytes' pour ne pas écraser le paramètre 'content'
         raw_bytes = await media.read()
         if len(raw_bytes) > MAX_FILE_SIZE:
             raise HTTPException(
@@ -144,17 +185,105 @@ async def create_post(
     db.commit()
     db.refresh(post)
 
-    return PostResponse(
-        id=post.id,
-        author_id=post.author_id,
+    return _post_to_response(post, current_user.id, db)
+
+
+@router.post(
+    "/{post_id}/like",
+    response_model=LikeToggleResponse,
+    summary="Aimer / retirer son like sur une publication",
+)
+def toggle_like(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    post = _get_post_or_404(post_id, db)
+    existing = (
+        db.query(PostLike)
+        .filter(PostLike.post_id == post.id, PostLike.user_id == current_user.id)
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        db.commit()
+        liked = False
+    else:
+        db.add(PostLike(post_id=post.id, user_id=current_user.id))
+        db.commit()
+        liked = True
+
+    like_count = (
+        db.query(func.count(PostLike.id)).filter(PostLike.post_id == post.id).scalar() or 0
+    )
+    return LikeToggleResponse(post_id=post.id, liked=liked, like_count=like_count)
+
+
+@router.get(
+    "/{post_id}/comments",
+    response_model=list[CommentResponse],
+    summary="Commentaires d'une publication",
+)
+def list_comments(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    _ = current_user
+    post = _get_post_or_404(post_id, db)
+    comments = (
+        db.query(PostComment)
+        .join(UserAuth, PostComment.author_id == UserAuth.id)
+        .filter(PostComment.post_id == post.id)
+        .order_by(PostComment.created_at.asc(), PostComment.id.asc())
+        .all()
+    )
+    return [
+        CommentResponse(
+            id=c.id,
+            post_id=c.post_id,
+            author_id=c.author_id,
+            first_name=c.author.first_name,
+            last_name=c.author.last_name,
+            avatar_url=c.author.avatar_url,
+            content=c.content,
+            created_at=str(c.created_at),
+        )
+        for c in comments
+    ]
+
+
+@router.post(
+    "/{post_id}/comments",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ajouter un commentaire",
+)
+def create_comment(
+    post_id: int,
+    body: CommentCreate,
+    db: Session = Depends(get_db),
+    current_user: UserAuth = Depends(get_current_user),
+):
+    post = _get_post_or_404(post_id, db)
+    comment = PostComment(
+        post_id=post.id,
+        author_id=current_user.id,
+        content=body.content.strip(),
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+
+    return CommentResponse(
+        id=comment.id,
+        post_id=comment.post_id,
+        author_id=comment.author_id,
         first_name=current_user.first_name,
         last_name=current_user.last_name,
         avatar_url=current_user.avatar_url,
-        content=post.content,
-        media_url=post.media_url,
-        media_type=post.media_type,
-        created_at=str(post.created_at),
-        updated_at=str(post.updated_at) if post.updated_at else None,
+        content=comment.content,
+        created_at=str(comment.created_at),
     )
 
 
@@ -168,9 +297,7 @@ def delete_post(
     db: Session = Depends(get_db),
     current_user: UserAuth = Depends(get_current_user),
 ):
-    post = db.query(Post).filter(Post.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post introuvable.")
+    post = _get_post_or_404(post_id, db)
 
     if post.author_id != current_user.id:
         raise HTTPException(

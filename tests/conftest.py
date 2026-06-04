@@ -1,4 +1,8 @@
 # tests/conftest.py — fixtures partagées pour les tests API
+import os
+
+os.environ.setdefault("OPENAI_API_KEY", "pytest-dummy-openai-key")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -124,7 +128,7 @@ def created_user(create_tables):
     return data
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def admin_headers(created_user):
     """JWT admin pour les routes /users/* réservées au back-office."""
     from api.models import UserAuth

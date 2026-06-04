@@ -1,0 +1,91 @@
+# HealthAI Coach — démo locale MSPR3
+# Usage :
+#   docker compose --profile full up -d --build
+#   docker compose --profile offline up -d --build
+#   docker compose --profile performance up -d --build
+
+name: healthai-coach
+
+services:
+  db:
+    image: postgres:16-alpine
+    profiles: [full, offline, performance]
+    environment:
+      POSTGRES_USER: healthai
+      POSTGRES_PASSWORD: healthai
+      POSTGRES_DB: healthai
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthai -d healthai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./db/migrations:/migrations:ro
+      - ./docker/db-init/99-run-migrations.sh:/docker-entrypoint-initdb.d/99_run_migrations.sh:ro
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    profiles: [full, offline, performance]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://healthai:healthai@db:5432/healthai
+      SECRET_KEY: ${SECRET_KEY:-demo-mspr3-secret-change-me}
+      ACCESS_TOKEN_EXPIRE_DAYS: "7"
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
+      OPENAI_MOCK: ${OPENAI_MOCK:-false}
+      LOG_LEVEL: INFO
+      SEED_DOCKER_DEMO_ADMIN: "true"
+      DEMO_ADMIN_EMAIL: admin@admin.com
+      DEMO_ADMIN_PASSWORD: admin
+      DEMO_ADMIN_FIRST_NAME: admin
+      DEMO_ADMIN_LAST_NAME: ""
+      DEMO_ADMIN_PLAN: premium_plus
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./media:/app/media
+
+  front:
+    build:
+      context: .
+      dockerfile: Dockerfile.front
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    profiles: [full, offline, performance]
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    profiles: [full, offline]
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    profiles: [full, offline]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  pgdata:

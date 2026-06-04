@@ -89,6 +89,19 @@ export const aiRequestsAPI = {
     api.get('/ai-requests/', { params: { user_id: userId, ...params } }),
 }
 
+export const postsAPI = {
+  getFeed: (params = {}) => api.get('/posts/', { params }),
+  create: (formData) =>
+    api.post('/posts/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  toggleLike: (postId) => api.post(`/posts/${postId}/like`),
+  getComments: (postId) => api.get(`/posts/${postId}/comments`),
+  addComment: (postId, content) =>
+    api.post(`/posts/${postId}/comments`, { content }),
+  deletePost: (postId) => api.delete(`/posts/${postId}`),
+}
+
 export const coachAPI = {
   getAdvice: (userId) => api.post('/coach/advice', { user_id: userId }),
   analyzePhoto: (userId, imageBase64) =>

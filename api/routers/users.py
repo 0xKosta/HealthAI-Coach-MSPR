@@ -186,16 +186,38 @@ def update_user(
 @router.delete(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Supprimer un utilisateur",
-    description="Supprime un utilisateur et toutes ses données liées (CASCADE).",
+    summary="Supprimer un utilisateur (admin)",
+    description=(
+        "Supprime le profil santé users et le compte user_auth lié. "
+        "Ordre : user_auth d'abord (posts, likes, commentaires en CASCADE), "
+        "puis users — même contrainte RESTRICT que DELETE /auth/me."
+    ),
 )
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _admin: UserAuth = Depends(require_admin),
+    current_admin: UserAuth = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
-    db.delete(user)
-    db.commit()
+
+    if current_admin.user_id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Supprimez votre propre compte via le profil connecté, pas depuis l'admin.",
+        )
+
+    account = db.query(UserAuth).filter(UserAuth.user_id == user_id).first()
+    try:
+        if account:
+            db.delete(account)
+            db.flush()
+        db.delete(user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Impossible de supprimer ce profil. Réessayez ou contactez le support.",
+        )

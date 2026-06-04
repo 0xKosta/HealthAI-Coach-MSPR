@@ -33,9 +33,12 @@ data/processed/
 data/interim/
 !tests/fixtures/**
 
-# Photos repas IA (stockage local dev / certif)
+# Médias uploadés (stockage local dev uniquement — pas dans Git)
+# En production : object storage dédié (S3, MinIO, etc.), comme pour ai-photos.
 media/ai-photos/*
 !media/ai-photos/.gitkeep
+media/posts/*
+!media/posts/.gitkeep
 
 # Logs
 logs/
