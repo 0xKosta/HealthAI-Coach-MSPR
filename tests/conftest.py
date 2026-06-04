@@ -2,6 +2,8 @@
 import os
 
 os.environ.setdefault("OPENAI_API_KEY", "pytest-dummy-openai-key")
+# Avant import api.database : create_engine() exige une URL (pas de .env en CI)
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 import pytest
 from fastapi.testclient import TestClient
