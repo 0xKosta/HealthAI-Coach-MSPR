@@ -77,9 +77,10 @@ docker compose --profile full down -v   # remise à zéro BDD
 
 | Contexte | Email | Mot de passe | Rôle / plan |
 |----------|-------|--------------|-------------|
-| **Docker seed** | `admin@admin.com` | `admin` | admin, premium_plus — **uniquement** stack Docker |
-| **Supabase / ETL** | `*.@healthai-coach.demo` | `1234` | comptes Kaggle (si seed_auth) |
-| **Inscription PWA** | tes comptes test | — | créés via `/register` |
+| **Docker admin** | `admin@admin.com` | `admin` | admin, premium_plus — seed Docker |
+| **Docker démo (10 users)** | `tom.thomas.1@healthai-coach.demo` … | `1234` | free/premium/premium_plus — `db/seed/docker_demo_data.json` |
+| **Supabase / ETL** | `*.@healthai-coach.demo` | `1234` | ~1000 profils Kaggle (cloud) |
+| **Feed oral** | compte connecté en live | — | posts / likes / photos à la main |
 
 ---
 

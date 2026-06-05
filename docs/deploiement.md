@@ -36,6 +36,27 @@ docker compose --profile full up -d --build
 
 Rôle `admin` — utiliser l’interface admin pour attribuer `premium` / `premium_plus` aux comptes de test.
 
+**Jeu de données démo** (seed automatique `SEED_DOCKER_DEMO_DATA=true`, source `db/seed/docker_demo_data.json`) :
+
+| Contenu | Quantité |
+|---------|----------|
+| Profils `users` + comptes `user_auth` | 10 |
+| `biometric_metrics` | ~300 (Trends) |
+| `workout_sessions` | 10 |
+| `exercises` | 20 |
+
+Comptes `.demo` : mot de passe **`1234`** (hash ETL, ex. `tom.thomas.1@healthai-coach.demo`).  
+**Feed social** : non seedé — publications/likes en démo live.
+
+Premier remplissage ou reset complet :
+
+```bash
+docker compose --profile full down -v
+.\scripts\demo-up.ps1
+```
+
+> Ordre au démarrage API : données démo → puis admin (`users.id` admin = 11).
+
 ### Profil offline
 
 Pas d'appel OpenAI réel — réponses fallback coach.

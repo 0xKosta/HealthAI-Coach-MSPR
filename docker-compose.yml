@@ -40,6 +40,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
       OPENAI_MOCK: ${OPENAI_MOCK:-false}
       LOG_LEVEL: INFO
+      SEED_DOCKER_DEMO_DATA: "true"
       SEED_DOCKER_DEMO_ADMIN: "true"
       DEMO_ADMIN_EMAIL: admin@admin.com
       DEMO_ADMIN_PASSWORD: admin

@@ -35,9 +35,13 @@ if ($profile -ne "performance") {
     Write-Host "  Prometheus : http://localhost:9090"
     Write-Host "  Grafana    : http://localhost:3001 (admin / admin)"
     Write-Host ""
+    Write-Host "Comptes demo (seed auto, mot de passe 1234) :"
+    Write-Host "  Ex. tom.thomas.1@healthai-coach.demo"
     Write-Host "Compte admin app (Docker demo uniquement) :"
     Write-Host "  Email      : admin@admin.com"
     Write-Host "  Mot de passe : admin"
+    Write-Host ""
+    Write-Host "Reset BDD + re-seed : docker compose --profile full down -v"
 }
 Write-Host ""
 Write-Host "Migration 007 sur Supabase existant (hors Docker) :"

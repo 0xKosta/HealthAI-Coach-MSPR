@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api/ api/
 COPY db/ db/
 COPY scripts/docker-entrypoint-api.sh /entrypoint.sh
-COPY scripts/seed_docker_demo_admin.py /app/scripts/
+COPY scripts/seed_docker_demo_admin.py scripts/seed_docker_demo_data.py scripts/
 RUN chmod +x /entrypoint.sh
 
 RUN mkdir -p media/posts media/ai-photos
