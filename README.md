@@ -17,20 +17,31 @@ Plateforme de coaching santé personnalisé alimentée par des données réelles
 Sources brutes (Kaggle CSV + GitHub JSON)
           │
           ▼
-   Pipeline ETL (etl/)
+   Pipeline ETL (etl/) — GitHub Actions planifié
    extract → transform → load
           │
           ▼
-   PostgreSQL — Supabase
-   9 tables relationnelles
+   PostgreSQL 16
+   (Supabase cloud · conteneur Docker en démo)
+   12 tables métier (+ schema_migrations)
           │
-     ┌────┴────────────┬──────────────┐
-     ▼                 ▼              ▼
- API REST           Frontend    Recommender ML
- (FastAPI :8000)    (:5173)     (FastAPI :8001, Random Forest)
-     │
-     └─ OpenAI GPT-4o (coach IA, vision, tendances)
+     ┌────┴────────────┬──────────────┬─────────────┐
+     ▼                 ▼              ▼             ▼
+ API REST           PWA Vue 3    Recommender ML   OpenAI
+ FastAPI :8000      :3000 dev    :8001 (MSPR2)    GPT-4o / mini
+ JWT · coach · feed :8080 Docker Random Forest   (mock offline)
+     │                 │
+     │            nginx (Docker)
+     └─────────────────┴──► Prometheus :9090 → Grafana :3001
 ```
+
+| Mode | BDD | Front | Monitoring |
+|------|-----|-------|------------|
+| **Dev local** | Supabase ou Postgres | `npm run dev` → `:3000` | — |
+| **Preview PWA** | idem | `npm run preview` → `:4173` | — |
+| **Docker MSPR3** | Postgres conteneur `:5432` | PWA `:8080` | profils `full` / `offline` |
+
+Schéma détaillé : [`docs/architecture-mspr3.md`](docs/architecture-mspr3.md) · ports et comptes : [`docs/reference-demo.md`](docs/reference-demo.md).
 
 **Sources de données :**
 
@@ -46,7 +57,7 @@ Sources brutes (Kaggle CSV + GitHub JSON)
 
 - Python 3.11+
 - Node.js 18+ (pour le frontend)
-- Un projet [Supabase](https://supabase.com) créé (fournit le PostgreSQL)
+- Un projet [Supabase](https://supabase.com) **ou** Docker Desktop (démo MSPR3 sans Supabase)
 - Une clé API OpenAI (pour les endpoints `/coach/*`)
 - Git
 
@@ -99,7 +110,7 @@ SECRET_KEY=une-chaine-aleatoire-longue-et-secrete-changez-moi
 ACCESS_TOKEN_EXPIRE_DAYS=7
 
 # CORS
-CORS_ORIGINS=http://localhost:5173,http://localhost:8000
+CORS_ORIGINS=http://localhost:3000,http://localhost:4173,http://localhost:8080,http://localhost:8000
 ```
 
 > **URL Supabase :** Settings → Database → Connection string → URI (mode `psycopg2`)
@@ -118,16 +129,25 @@ Ou via le **SQL Editor** du dashboard Supabase.
 
 > **Ne pas relancer `init.sql`** sur une base déjà peuplée — les `DROP` effacent toutes les données.
 
-### 6. MSPR 3 — Tables réseau social (`user_auth` + `posts`)
+### 6. MSPR 3 — Migrations réseau social, auth et IA
 
-Si les tables `user_auth` et `posts` n'existent pas encore :
+Appliquer les migrations **additives** dans l'ordre (SQL Editor Supabase ou `psql`) :
 
 ```bash
-# Migration additive (ne touche pas aux données existantes)
-psql -h <host> -U <user> -d <dbname> -f db/migrations/001_user_auth_posts.sql
+psql ... -f db/migrations/001_user_auth_posts.sql
+psql ... -f db/migrations/005_user_auth_role_plan.sql
+psql ... -f db/migrations/006_ai_requests.sql
+psql ... -f db/migrations/007_post_likes_comments.sql
 ```
 
-Puis charger les 100 comptes démo :
+| Migration | Effet |
+|-----------|--------|
+| `001` | `user_auth`, `posts` |
+| `005` | `role`, `plan` sur `user_auth` |
+| `006` | Historique `ai_requests` |
+| `007` | `post_likes`, `post_comments` |
+
+Puis charger les 100 comptes démo Supabase :
 
 ```bash
 python db/seed_auth.py
@@ -187,7 +207,8 @@ npm install
 npm run dev
 ```
 
-Le frontend démarre sur `http://localhost:5173` et se connecte automatiquement à l'API sur `http://localhost:8000`.
+Le frontend démarre sur `http://localhost:3000` et se connecte à l'API sur `http://localhost:8000`.  
+Preview PWA installable : `npm run build` puis `npm run preview` → `http://localhost:4173`.
 
 ---
 
@@ -212,7 +233,7 @@ Pour tester l'application complète (API + front + micro-service ML), ouvrir **t
 | Terminal | Commande | URL |
 |----------|----------|-----|
 | 1 — API principale | `uvicorn api.main:app --reload` | http://localhost:8000/docs |
-| 2 — Frontend | `cd front-end` puis `npm run dev` | http://localhost:5173 |
+| 2 — Frontend | `cd front-end` puis `npm run dev` | http://localhost:3000 |
 | 3 — Recommandation ML | `uvicorn recommender.main:app --port 8001 --reload` | http://localhost:8001/docs |
 
 **Prérequis recommender :** `pip install -r recommender/requirements.txt` et présence de `recommender/model.pkl` (sinon `python -m recommender.train`).
@@ -294,11 +315,7 @@ Micro-service FastAPI **séparé** de l'API principale — prédit le type d'ent
 
 **Front PWA :** route `/dashboard/:userId/feed` (onglet **Communauté**). Voir [`docs/application-mobile-pwa.md`](docs/application-mobile-pwa.md).
 
-**Migration likes/commentaires :**
-
-```bash
-psql -h <host> -U <user> -d <dbname> -f db/migrations/007_post_likes_comments.sql
-```
+**Migration likes/commentaires** — incluse dans la liste ci-dessus (`007`).
 
 > 🔒 = endpoint protégé, nécessite un token JWT dans le header `Authorization: Bearer <token>`
 
@@ -309,16 +326,22 @@ psql -h <host> -U <user> -d <dbname> -f db/migrations/007_post_likes_comments.sq
 ## MSPR3 — Démo Docker (une commande)
 
 ```powershell
-.\scripts\demo-up.ps1          # profil complet + monitoring
-.\scripts\demo-up.ps1 -Offline # coach IA en mode mock
+.\scripts\demo-up.ps1              # profil full — stack complète + monitoring
+.\scripts\demo-up.ps1 -Offline     # mock OpenAI (pas d'appel réel)
+.\scripts\demo-up.ps1 -Performance # sans Prometheus/Grafana, limites mémoire
 ```
 
-| Service | URL |
-|---------|-----|
-| PWA | http://localhost:8080 |
-| API | http://localhost:8000/docs |
-| Prometheus | http://localhost:9090 |
-| Grafana | http://localhost:3001 (admin / admin) |
+Équivalent : `docker compose --profile full|offline|performance up -d --build`.
+
+| Service | URL | Détail |
+|---------|-----|--------|
+| PWA (nginx) | http://localhost:8080 | Point d'entrée démo jury |
+| API + Swagger | http://localhost:8000/docs | JWT, feed, coach, `/metrics` |
+| PostgreSQL | localhost:5432 | `healthai` / `healthai` / `healthai` |
+| Prometheus | http://localhost:9090 | Profils `full` et `offline` |
+| Grafana | http://localhost:3001 | admin / admin |
+
+**Seed automatique au démarrage Docker** (`SEED_DOCKER_DEMO_DATA=true`) : 10 profils + comptes `.demo` (mdp `1234`), biométrie, exercices, séances. Feed social non seedé (démo live). Reset : `docker compose --profile full down -v` puis `demo-up.ps1`.
 
 **Compte admin application (seed Docker uniquement, pas Supabase) :**
 
@@ -329,9 +352,7 @@ psql -h <host> -U <user> -d <dbname> -f db/migrations/007_post_likes_comments.sq
 
 Permet de passer d’autres comptes en `premium` / `premium_plus` via l’interface admin.
 
-Documentation : [`docs/deploiement.md`](docs/deploiement.md), [`docs/monitoring.md`](docs/monitoring.md), [`docs/ci-cd.md`](docs/ci-cd.md).
-
-**Référence rapide démo (ports, modes dev/preview/Docker, Grafana) :** [`docs/reference-demo.md`](docs/reference-demo.md).
+Documentation : [`docs/deploiement.md`](docs/deploiement.md), [`docs/monitoring.md`](docs/monitoring.md), [`docs/ci-cd.md`](docs/ci-cd.md), [`docs/reference-demo.md`](docs/reference-demo.md).
 
 ---
 
@@ -377,18 +398,7 @@ Rapport HTML : ouvrir `htmlcov/index.html` dans le navigateur.
 
 > Si `pytest-cov` n'est pas installé : `pip install pytest-cov`
 
-**Couverture indicative : ~73%** — lancer `pytest tests/ -v` pour l'état actuel (57 tests, dont `tests/test_biometrics.py`).
-
-| Fichier | Couverture |
-|---------|-----------|
-| `api/models.py` | 100% |
-| `api/schemas.py` | 100% |
-| `api/main.py` | 100% |
-| `api/routers/coach.py` | 78% |
-| `api/routers/users.py` | 67% |
-| `api/routers/metrics.py` | 61% |
-| `api/routers/nutrition.py` | 49% |
-| `api/routers/exercises.py` | 41% |
+**~66 tests** (auth, posts, permissions, biométrie, coach, routes) — SQLite en mémoire, OpenAI mocké. CI : [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Détail : [`docs/plan-de-tests.md`](docs/plan-de-tests.md).
 
 ### Frontend — Vitest (logique UI)
 
@@ -419,7 +429,7 @@ Le fichier `docs/openapi.json` est versionné dans le dépôt.
 api/
 ├── main.py              # Point d'entrée FastAPI + CORS + routers + handler 400 biométrie
 ├── database.py          # Connexion SQLAlchemy 2 + générateur get_db()
-├── models.py            # 9 modèles ORM — syntaxe Mapped[] (SQLAlchemy 2)
+├── models.py            # 12 modèles ORM — syntaxe Mapped[] (SQLAlchemy 2)
 ├── schemas.py           # Schémas Pydantic v2 (input strict / response + profile_issues)
 ├── biometrics.py        # Règles métier âge, taille, poids, IMC
 ├── ai_client.py         # Client OpenAI centralisé
@@ -457,33 +467,53 @@ etl/
 └── config.py            # Configuration centralisée
 
 db/
-├── init.sql             # Création des 7 tables MSPR 1/2
+├── init.sql             # Tables MSPR 1/2 (nutrition, fitness, biométrie)
 ├── seed.sql             # Données de test MSPR 1/2
 ├── queries.sql          # Requêtes analytiques
-├── seed_auth.py         # 100 comptes démo user_auth (MSPR 3)
-└── migrations/
+├── seed_auth.py         # 100 comptes démo user_auth (Supabase)
+├── seed/                # Jeu Docker (docker_demo_data.json)
+└── migrations/          # Migrations additives 001 → 007
     ├── 001_user_auth_posts.sql
-    ├── 007_post_likes_comments.sql
     ├── 002_users_age_nullable.sql
-    └── 004_users_biometric_checks.sql
+    ├── 004_users_biometric_checks.sql
+    ├── 005_user_auth_role_plan.sql
+    ├── 006_ai_requests.sql
+    └── 007_post_likes_comments.sql
 
+docker-compose.yml       # Profils full / offline / performance
+docker-compose.offline.yml
+docker-compose.performance.yml
 scripts/
+├── demo-up.ps1          # Démarrage démo Docker
+├── seed_docker_demo_data.py
 ├── backup_db.py         # Sauvegarde / restauration PostgreSQL
 └── backup_db.ps1        # Version PowerShell (Windows)
 
 docs/
-├── openapi.json         # Schéma OpenAPI exporté
-├── sources.md           # Inventaire des sources de données
-├── modele-donnees.md    # Documentation du schéma relationnel
-└── validation-biometrique.md  # Règles profil + IA + migrations
+├── architecture-mspr3.md    # Vue système MSPR3
+├── modele-donnees.md        # MCD / MLD / MPD (Merise + dbdiagram)
+├── deploiement.md           # Docker, profils, seed
+├── reference-demo.md        # Ports, comptes, modes dev/preview/Docker
+├── monitoring.md            # Prometheus + Grafana
+├── ci-cd.md                 # Pipeline GitHub Actions
+├── application-mobile-pwa.md  # PWA, feed, install mobile
+├── plan-de-tests.md         # Stratégie de tests
+├── demo-oral-checklist.md   # Préparation soutenance
+├── openapi.json             # Schéma OpenAPI exporté
+├── sources.md               # Inventaire des sources de données
+└── validation-biometrique.md
 
 media/posts/             # Médias uploadés (non versionnés — dans .gitignore)
 backups/                 # Dumps PostgreSQL (non versionnés — dans .gitignore)
 
 tests/
-├── conftest.py          # Fixtures pytest partagées
-├── test_routes.py       # Tests d'intégration API
-└── test_biometrics.py   # Validation biométrique
+├── conftest.py          # Fixtures pytest (SQLite mémoire)
+├── test_routes.py       # CRUD métier
+├── test_biometrics.py   # Validation biométrique
+├── test_posts.py        # Feed, likes, commentaires
+├── test_auth_delete.py  # Suppression compte RGPD
+├── test_permissions.py  # Rôles et plans
+└── test_ai_requests.py  # Historique coach IA
 
 export_openapi.py        # Script export openapi.json
 env.example              # Template .env
@@ -493,13 +523,33 @@ mcd.png                  # Modèle Conceptuel de Données
 
 ---
 
-## Schéma relationnel
+## Modèle de données
 
-![Modèle Conceptuel de Données](mcd.png)
+| Niveau | Contenu | Fichier |
+|--------|---------|---------|
+| **MCD Merise** | Entités + cardinalités (MSPR1-2 + extension MSPR3) | [`docs/modele-donnees.md`](docs/modele-donnees.md) §1 |
+| **MLD** | Schéma relationnel (PK/FK) | [`docs/modele-donnees.md`](docs/modele-donnees.md) §2 |
+| **MPD** | DBML dbdiagram.io + migrations SQL | [`docs/modele-donnees.md`](docs/modele-donnees.md) §3 · `db/migrations/` |
 
-9 tables : `users`, `foods`, `exercises`, `food_logs`, `workout_sessions`, `session_exercises`, `biometric_metrics`, `user_auth`, `posts`.
+**12 tables métier :** `users`, `foods`, `exercises`, `food_logs`, `workout_sessions`, `session_exercises`, `biometric_metrics`, `user_auth`, `posts`, `post_likes`, `post_comments`, `ai_requests`.
 
-Documentation complète dans [`docs/modele-donnees.md`](docs/modele-donnees.md).
+![Schéma historique MSPR1-2](mcd.png) — *figure MSPR2 ; régénérer depuis dbdiagram pour la version MSPR3 complète.*
+
+---
+
+## Documentation complémentaire
+
+| Document | Sujet |
+|----------|--------|
+| [`docs/architecture-mspr3.md`](docs/architecture-mspr3.md) | Composants, déploiement, sécurité |
+| [`docs/deploiement.md`](docs/deploiement.md) | Docker Compose, seed, reset |
+| [`docs/reference-demo.md`](docs/reference-demo.md) | Ports, comptes, 3 modes (dev / preview / Docker) |
+| [`docs/monitoring.md`](docs/monitoring.md) | Prometheus, Grafana, métriques API |
+| [`docs/ci-cd.md`](docs/ci-cd.md) | GitHub Actions (tests, build, ETL) |
+| [`docs/application-mobile-pwa.md`](docs/application-mobile-pwa.md) | PWA, feed social, mobile |
+| [`docs/plan-de-tests.md`](docs/plan-de-tests.md) | Pytest, Vitest, recette |
+| [`docs/demo-oral-checklist.md`](docs/demo-oral-checklist.md) | Checklist soutenance |
+| [`docs/gestion-projet.md`](docs/gestion-projet.md) | Kanban, sprints |
 
 ---
 
