@@ -1,8 +1,11 @@
 # Modele de donnees — HealthAI Coach
 
-**MSPR Bloc 1 — Role B : Data Modeler**
+**MSPR Blocs 1, 2 & 3 — Role B : Data Modeler**
 **Outil de modelisation :** dbdiagram.io
-**Base de donnees :** PostgreSQL 15 via Supabase
+**Base de donnees :** PostgreSQL 15+ (Supabase / Docker)
+
+> **MSPR3 :** le MCD/MLD MSPR1-2 (nutrition, fitness, biométrie) est inchangé. S’ajoutent
+> `user_auth`, `posts`, `post_likes`, `post_comments` et `ai_requests` (migrations 001, 005, 006, 007).
 
 ---
 
@@ -19,6 +22,11 @@
 | **EXERCICE** | Description d'un exercice sportif (catalogue) | ExerciseDB (GitHub, JSON) |
 | **EXERCICE_SEANCE** | Liaison entre une seance et les exercices pratiques | Derive |
 | **METRIQUE_BIOMETRIQUE** | Suivi biometrique temporel (poids, sommeil, FC repos) | Derive / futur wearable |
+| **COMPTE_AUTH** | Compte de connexion (email, JWT, plan, role) | MSPR3 |
+| **PUBLICATION** | Post du feed social (texte et/ou media) | MSPR3 |
+| **LIKE_PUBLICATION** | Like d’un utilisateur sur une publication | MSPR3 |
+| **COMMENTAIRE** | Commentaire sur une publication | MSPR3 |
+| **REQUETE_IA** | Historique des appels coach IA (OpenAI) | MSPR3 |
 
 ### Associations et cardinalites
 
@@ -46,6 +54,28 @@ EXERCICE ────(1,n)──────────────── EXERC
 UTILISATEUR ──(1,n)──────────────── METRIQUE_BIOMETRIQUE
             Un utilisateur possede un ou plusieurs enregistrements.
             Un enregistrement appartient a un seul utilisateur.
+
+UTILISATEUR ──(0,1)──────────────── COMPTE_AUTH
+            Un profil santé peut avoir au plus un compte de connexion.
+            Un compte est lie a un seul profil users.
+
+COMPTE_AUTH ──(1,n)──────────────── PUBLICATION
+            Un compte publie zero ou plusieurs posts.
+
+PUBLICATION ──(1,n)──────────────── LIKE_PUBLICATION
+            Une publication recoit zero ou plusieurs likes.
+
+COMPTE_AUTH ──(1,n)──────────────── LIKE_PUBLICATION
+            Un compte peut liker plusieurs publications.
+
+PUBLICATION ──(1,n)──────────────── COMMENTAIRE
+            Une publication a zero ou plusieurs commentaires.
+
+COMPTE_AUTH ──(1,n)──────────────── COMMENTAIRE
+            Un compte redige zero ou plusieurs commentaires.
+
+UTILISATEUR ──(1,n)──────────────── REQUETE_IA
+            Historique des requetes coach IA par profil santé.
 ```
 
 ---
@@ -137,15 +167,74 @@ biometric_metrics(
     resting_bpm   FLOAT,
     notes         TEXT
 )
+
+-- MSPR3 — authentification et reseau social
+
+user_auth(
+    id*             INTEGER  PK auto-incremente,
+    user_id*        INTEGER  FK UNIQUE -> users(id),
+    email*          VARCHAR(255) UNIQUE,
+    password_hash*  TEXT,
+    first_name*     VARCHAR(100),
+    last_name*      VARCHAR(100),
+    avatar_url      TEXT,
+    role*           VARCHAR(20),   -- user | admin | demo
+    plan*           VARCHAR(20),   -- free | premium | premium_plus
+    created_at*     TIMESTAMPTZ,
+    updated_at*     TIMESTAMPTZ
+)
+
+posts(
+    id*           INTEGER  PK auto-incremente,
+    author_id*    INTEGER  FK -> user_auth(id),
+    content       TEXT,
+    media_url     TEXT,
+    media_type    VARCHAR(20),     -- image | video
+    created_at*   TIMESTAMPTZ,
+    updated_at*   TIMESTAMPTZ
+)
+
+post_likes(
+    id*           INTEGER  PK auto-incremente,
+    post_id*      INTEGER  FK -> posts(id),
+    user_id*      INTEGER  FK -> user_auth(id),
+    created_at*   TIMESTAMPTZ,
+    UNIQUE(post_id, user_id)
+)
+
+post_comments(
+    id*           INTEGER  PK auto-incremente,
+    post_id*      INTEGER  FK -> posts(id),
+    author_id*    INTEGER  FK -> user_auth(id),
+    content*      TEXT,
+    created_at*   TIMESTAMPTZ
+)
+
+ai_requests(
+    id*             BIGINT   PK auto-incremente,
+    user_id*        INTEGER  FK -> users(id),
+    request_type*   VARCHAR(30),
+    status*         VARCHAR(20),
+    created_at*     TIMESTAMPTZ,
+    input_summary   TEXT,
+    output_summary  TEXT,
+    input_json      JSONB,
+    output_json     JSONB,
+    photo_path      VARCHAR(500),
+    error_message   TEXT,
+    from_cache      BOOLEAN
+)
 ```
 
 ---
 
 ## 3. MPD — Modele Physique de Donnees (DBML pour dbdiagram.io)
 
-Coller ce code sur [dbdiagram.io](https://dbdiagram.io) pour regenerer le diagramme :
+Coller ce code sur [dbdiagram.io](https://dbdiagram.io) pour regenerer le diagramme (MSPR1-2 + extension MSPR3) :
 
 ```
+// --- MSPR 1/2 : nutrition, fitness, biométrie ---
+
 Table users {
   id           integer   [pk, increment]
   name         varchar   [not null]
@@ -173,17 +262,17 @@ Table foods {
 Table exercises {
   id              integer  [pk, increment]
   name            varchar  [not null, note: "EN"]
-  name_fr         varchar  [note: "FR - traduction automatique"]
+  name_fr         varchar  [note: "FR"]
   type            varchar  [note: "EN"]
   type_fr         varchar  [note: "FR"]
   muscle_group    varchar  [note: "EN"]
   muscle_group_fr varchar  [note: "FR"]
   equipment       varchar  [note: "EN"]
   equipment_fr    varchar  [note: "FR"]
-  level           varchar  [note: "EN - beginner / intermediate / expert"]
-  level_fr        varchar  [note: "FR - debutant / intermediaire / expert"]
+  level           varchar  [note: "EN"]
+  level_fr        varchar  [note: "FR"]
   instructions    text     [note: "EN"]
-  instructions_fr text     [note: "FR - traduction automatique"]
+  instructions_fr text     [note: "FR"]
   gif_url         text
   video_url       text
   image_url       text
@@ -227,6 +316,66 @@ Table biometric_metrics {
   resting_bpm decimal
   notes       text
 }
+
+// --- MSPR 3 : auth, feed social, historique IA ---
+
+Table user_auth {
+  id            integer   [pk, increment]
+  user_id       integer   [ref: - users.id, unique, not null]
+  email         varchar   [unique, not null]
+  password_hash varchar   [not null]
+  first_name    varchar   [not null]
+  last_name     varchar   [not null]
+  avatar_url    text
+  role          varchar   [not null, default: 'user', note: 'user | admin | demo']
+  plan          varchar   [not null, default: 'free', note: 'free | premium | premium_plus']
+  created_at    timestamp [not null]
+  updated_at    timestamp [not null]
+}
+
+Table posts {
+  id          integer   [pk, increment]
+  author_id   integer   [ref: > user_auth.id, not null]
+  content     text
+  media_url   text      [note: 'fichier local /media/posts/']
+  media_type  varchar   [note: 'image | video']
+  created_at  timestamp [not null]
+  updated_at  timestamp [not null]
+}
+
+Table post_likes {
+  id         integer   [pk, increment]
+  post_id    integer   [ref: > posts.id, not null]
+  user_id    integer   [ref: > user_auth.id, not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (post_id, user_id) [unique]
+  }
+}
+
+Table post_comments {
+  id         integer   [pk, increment]
+  post_id    integer   [ref: > posts.id, not null]
+  author_id  integer   [ref: > user_auth.id, not null]
+  content    text      [not null]
+  created_at timestamp [not null]
+}
+
+Table ai_requests {
+  id             bigint    [pk, increment]
+  user_id        integer   [ref: > users.id, not null]
+  request_type   varchar   [not null, note: 'advice | analyze_photo | workout_plan | biometric_trend | meal_plan']
+  status         varchar   [not null, default: 'success', note: 'success | error']
+  created_at     timestamp [not null]
+  input_summary  text
+  output_summary text
+  input_json     json
+  output_json    json
+  photo_path     varchar
+  error_message  text
+  from_cache     boolean   [not null, default: false]
+}
 ```
 
 ---
@@ -234,7 +383,9 @@ Table biometric_metrics {
 ## 4. Diagramme MCD
 
 > Exporter le diagramme depuis dbdiagram.io en PNG et le placer ici :
-> `docs/mcd.png`
+> `docs/mcd.png` (ou `mcd.png` a la racine du repo)
+
+Apres MSPR3 : regenerer le PNG pour inclure `user_auth`, `posts`, `post_likes`, `post_comments`, `ai_requests`.
 
 ![MCD HealthAI Coach](./mcd.png)
 
