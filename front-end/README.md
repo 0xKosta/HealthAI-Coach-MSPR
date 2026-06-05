@@ -1,7 +1,15 @@
-# HealthAI Coach - Frontend
+# HealthAI Coach — Frontend
 
-Interface web du projet **HealthAI Coach** (Vue 3, Vite, Tailwind).  
-Elle consomme l'API FastAPI sur `http://localhost:8000` (variable `VITE_API_BASE_URL`).
+Interface **PWA** du projet HealthAI Coach (Vue 3, Vite, Tailwind).  
+Consomme l'API FastAPI via `VITE_API_BASE_URL` (défaut `http://localhost:8000`).
+
+| Mode | URL front | API |
+|------|-----------|-----|
+| **Dev** | http://localhost:3000 | `:8000` (uvicorn local ou Docker) |
+| **Preview PWA** | http://localhost:4173 | `:8000` |
+| **Docker MSPR3** | http://localhost:8080 | `:8000` (build nginx) |
+
+Référence ports / comptes : [`../docs/reference-demo.md`](../docs/reference-demo.md).
 
 ---
 
@@ -10,22 +18,24 @@ Elle consomme l'API FastAPI sur `http://localhost:8000` (variable `VITE_API_BASE
 | Outil | Version | Rôle |
 |---|---|---|
 | Vue 3 | ^3.4 | Framework (Composition API, `<script setup>`) |
-| Vite | ^5.2 | Bundler et dev server |
+| Vite | ^5.2 | Bundler et dev server (port **3000**) |
 | Tailwind CSS | ^3.4 | Styles utilitaires |
 | Pinia | ^2.1 | État global (auth, utilisateur sélectionné, statut API) |
 | Vue Router | ^4.3 | SPA + guards JWT / admin |
 | ApexCharts | ^5.10 | Graphiques biométriques |
 | Axios | ^1.6 | HTTP vers l'API |
-| vite-plugin-pwa | ^1.3 | Service Worker + manifest |
+| vite-plugin-pwa | ^1.3 | Service Worker + manifest installable |
 
 ---
 
 ## Prérequis
 
 - **Node.js** ≥ 18, **npm** ≥ 9
-- **Backend** sur `http://localhost:8000` (`uvicorn api.main:app --reload` depuis la racine du repo)
+- **Backend** sur `http://localhost:8000` :
+  - dev local : `uvicorn api.main:app --reload` (racine du repo)
+  - démo jury : `.\scripts\demo-up.ps1` → PWA `:8080` + API `:8000`
 
-Si l'API est arrêtée, l'app affiche un écran **« Serveur déconnecté »** (ping `/health` + détection des erreurs réseau).
+Si l'API est arrêtée, l'app affiche **« Serveur déconnecté »** (ping `/health` + détection erreurs réseau).
 
 ---
 
@@ -38,45 +48,66 @@ npm install
 
 | Commande | Description |
 |---|---|
-| `npm run dev` | Dev — `http://localhost:3000` |
+| `npm run dev` | Dev — http://localhost:3000 (PWA **non** installable) |
 | `npm run build` | Build production → `dist/` |
-| `npm run preview` | Preview du build — `http://localhost:4173` |
-| `npm test` | Tests unitaires front (Vitest) — logique profil IA & statut API |
+| `npm run preview` | Preview du build — http://localhost:4173 (PWA testable) |
+| `npm test` | Vitest — logique profil IA & statut API |
+| `npm run test:watch` | Vitest en mode watch |
 
-> Le Service Worker PWA est **désactivé en `dev`**. Tester l'installation PWA : `npm run build && npm run preview`.
+> Service Worker **désactivé en `dev`**. Installation PWA : `npm run build && npm run preview` ou stack Docker `:8080`.
 
-### Tests front (Vitest)
+### Build Docker
+
+L'image front (`Dockerfile.front`) injecte `VITE_API_BASE_URL=http://localhost:8000` au build. Ne pas oublier de rebuild après changement d'URL API :
+
+```bash
+docker compose --profile full up -d --build
+```
+
+---
+
+## Tests front (Vitest)
 
 ```bash
 npm test
 ```
 
-Couvre la logique métier UI critique (`useProfileCompletion`, détection panne réseau).
+**7 tests** sur la logique UI critique :
 
-**MSPR3 — Feed social (PWA)** : route `/dashboard/:userId/feed`, onglet **Communauté**, API `postsAPI` (publications, likes, commentaires). Installation PWA : `PwaInstallBanner.vue`. Doc : [`../docs/application-mobile-pwa.md`](../docs/application-mobile-pwa.md).
+| Fichier | Sujet |
+|---------|--------|
+| `useProfileCompletion.spec.js` | Accès coach IA selon profil complet |
+| `apiStatus.spec.js` | Détection panne réseau / API down |
+
+Parcours complets (login, nutrition, feed, PWA) : recette manuelle — voir [`../docs/plan-de-tests.md`](../docs/plan-de-tests.md).
 
 ---
 
 ## Authentification
 
-- Connexion / inscription : `/login`, `/register` (JWT dans `localStorage`, clé `healthai_token`)
-- Profil santé utilisateur : `GET` / `PUT` **`/auth/me/profile`**
-- Compte (email, plan, rôle) : **`/auth/me`**, admin → **`/auth/admin/users`**
-- Routes protégées : guard `requiresAuth` ; back-office : `requiresAdmin`
+- Connexion / inscription : `/login`, `/register` (JWT → `localStorage`, clé `healthai_token`)
+- Profil santé : `GET` / `PUT` **`/auth/me/profile`**
+- Compte (email, plan, rôle) : **`/auth/me`**
+- Admin : **`/auth/admin/users`**, routes `requiresAdmin`
+- Routes protégées : guard `requiresAuth`
 
-Stores Pinia : `authStore` (session), `userStore` (utilisateur affiché en admin), `apiStatusStore` (API joignable ou non).
+Stores Pinia : `authStore`, `userStore` (contexte admin), `apiStatusStore`.
 
 ---
 
-## PWA
+## PWA & mobile
 
 | Élément | Détail |
 |---|---|
 | Manifest | `standalone`, icônes 192 / 512 |
 | Service Worker | Workbox (`vite-plugin-pwa`) |
 | Cache API | `NetworkFirst` sur `/api/` (TTL 5 min) |
+| Bannière install | `PwaInstallBanner.vue` |
+| Navigation tactile | Swipe horizontal entre vues (`useViewNav`) |
 
-Voir section « Tester la PWA » : build + preview + Chrome DevTools → Application.
+Doc complète : [`../docs/application-mobile-pwa.md`](../docs/application-mobile-pwa.md).
+
+**Tester l'installation :** Chrome DevTools → Application → Manifest / Service Workers, ou Safari « Sur l'écran d'accueil ».
 
 ---
 
@@ -91,10 +122,10 @@ front-end/
 │   │   ├── layout/            # Navbar, AdminUserTabs
 │   │   ├── admin/             # AiRequestHistoryPanel
 │   │   └── ui/                # AIAdviceCard, ErrorAlert, ProfileAiGate,
-│   │                            # ServerUnavailableView, PlanBadge…
-│   ├── composables/           # useProfileCompletion, useAiAccess, useDisplayName…
+│   │                            # ServerUnavailableView, PlanBadge, PwaInstallBanner…
+│   ├── composables/           # useProfileCompletion, useAiAccess, useViewNav…
 │   ├── router/                # index.js, redirect.js, transition.js
-│   ├── services/api.js        # Axios + authAPI, coachAPI, aiRequestsAPI…
+│   ├── services/api.js        # authAPI, coachAPI, postsAPI, aiRequestsAPI…
 │   ├── stores/
 │   │   ├── authStore.js
 │   │   ├── userStore.js
@@ -111,28 +142,31 @@ front-end/
 ## Pages
 
 ### Authentification (publiques)
-- **`/login`**, **`/register`** — JWT, redirection vers dashboard ou admin
+- **`/login`**, **`/register`** — JWT, redirection dashboard ou admin
 
 ### Utilisateur (`/dashboard/:userId/…`)
-- **Dashboard** — profil, stats, conseil IA (`POST /coach/advice`), verrouillage si profil incomplet
-- **Nutrition** — onglets **photo repas** (`/coach/analyze-photo`) et **plan repas** (`/coach/meal-plan`), historique IA Premium
+- **Dashboard** — profil, stats, conseil IA (`POST /coach/advice`), verrou si profil incomplet
+- **Nutrition** — photo repas (`/coach/analyze-photo`), plan repas (`/coach/meal-plan`), historique IA Premium
 - **Workout** — `POST /coach/workout-plan`
 - **Trends** — métriques + `POST /coach/biometric-trend`
 - **Profile** — `PUT /auth/me/profile`, validation biométrique temps réel
+- **Communauté** — **`/dashboard/:userId/feed`** (`FeedView.vue`) : feed, publication texte/média, likes, commentaires
 - **`/exercises`** — catalogue `GET /exercises/`
 - **`/no-profile`** — compte sans profil santé lié
+
+Navigation : onglets Navbar + swipe entre Dashboard / Nutrition / Entraînement / Tendances ; onglet **Communauté** séparé.
 
 ### Admin (`/admin/…`)
 - **Liste utilisateurs** — `TrendsUsersView`, filtres, édition compte (email, plan, rôle)
 - **Création utilisateur** — `AdminUserCreateView`
-- **Fiches user** — même vues que l'utilisateur (dashboard, nutrition, workout, trends, profile) avec onglets admin + double historique IA sur Nutrition
+- **Fiches user** — mêmes vues que l'utilisateur (dashboard, nutrition, workout, trends, profile) + onglets admin + historique IA sur Nutrition
 
 ---
 
 ## Indisponibilité API
 
-- Au démarrage : vérification périodique de **`GET /health`**
-- Toute requête axios sans réponse réseau → écran plein **`ServerUnavailableView`**
+- Au démarrage : vérification périodique **`GET /health`**
+- Requête axios sans réponse réseau → **`ServerUnavailableView`**
 - Bouton **Réessayer** relance le health check
 
 ---
@@ -152,7 +186,7 @@ Typo : **Inter** (Google Fonts).
 
 ---
 
-## Endpoints API utilisés (principal)
+## Endpoints API utilisés
 
 | Méthode | Endpoint | Usage |
 |---|---|---|
@@ -168,10 +202,15 @@ Typo : **Inter** (Google Fonts).
 | `POST` | `/coach/meal-plan` | Nutrition (plan repas) |
 | `POST` | `/coach/workout-plan` | Workout |
 | `POST` | `/coach/biometric-trend` | Trends |
+| `GET` | `/posts/` | Feed social |
+| `POST` | `/posts/` | Créer publication (multipart) |
+| `POST` | `/posts/{id}/like` | Like / unlike |
+| `GET` / `POST` | `/posts/{id}/comments` | Commentaires |
+| `DELETE` | `/posts/{id}` | Supprimer sa publication |
 
 Règles biométriques et quotas IA : [`../docs/validation-biometrique.md`](../docs/validation-biometrique.md).
 
-CORS backend : `http://localhost:3000` et `http://localhost:4173`.
+**CORS backend** (`.env` / Docker) : `http://localhost:3000`, `http://localhost:4173`, `http://localhost:8080`.
 
 ---
 
@@ -179,7 +218,7 @@ CORS backend : `http://localhost:3000` et `http://localhost:4173`.
 
 - Composition API + `<script setup>`
 - Appels HTTP **uniquement** via `src/services/api.js`
-- États **loading** / **error** gérés dans les vues
+- États **loading** / **error** dans les vues
 - Composants `ui/` sans logique métier lourde
 
 Benchmark framework : [`../benchmark-frontend.md`](../benchmark-frontend.md) (racine du repo).
