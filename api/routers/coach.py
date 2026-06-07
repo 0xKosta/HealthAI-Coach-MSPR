@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from api.ai_client import client
+from api.ai_client import client, should_persist_ai_history
 from api.database import get_db
 from api.models import User, UserAuth, BiometricMetric, WorkoutSession
 
@@ -31,7 +31,7 @@ from api.ai_request_service import (
 from api.coach_utils import (
     advice_cache, workout_cache, trend_cache, meal_cache,
     coach_limiter,
-    get_fallback_advice, FALLBACK_WORKOUT, FALLBACK_TREND, FALLBACK_MEAL,
+    get_fallback_advice, get_fallback_photo, FALLBACK_WORKOUT, FALLBACK_TREND, FALLBACK_MEAL,
     TTLCache,
     validate_image_base64,
 )
@@ -174,6 +174,13 @@ NOT_A_MEAL_DETAIL = (
     "Cette image ne correspond pas à un repas. "
     "Choisissez une photo de votre assiette ou de vos aliments."
 )
+
+
+def _persist_coach_request(db: Session, **kwargs):
+    """Enregistre l'historique IA sauf en mode démo offline (OPENAI_MOCK=true)."""
+    if not should_persist_ai_history():
+        return None
+    return persist_ai_request(db, **kwargs)
 
 
 # =============================================================================
@@ -327,7 +334,7 @@ def get_ai_advice(
     cached = advice_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/advice user_id=%s", user.id)
-        persist_ai_request(db, **build_advice_record(
+        _persist_coach_request(db, **build_advice_record(
             user.id, display_name, cached, from_cache=True
         ))
         return CoachResponse(user_id=user.id, user_name=display_name, advice=cached)
@@ -374,7 +381,7 @@ def get_ai_advice(
         logger.error("Erreur OpenAI /advice : %s", exc, exc_info=True)
         advice_text = get_fallback_advice(user.goal)  # fallback au lieu de 502
 
-    persist_ai_request(db, **build_advice_record(user.id, display_name, advice_text))
+    _persist_coach_request(db, **build_advice_record(user.id, display_name, advice_text))
     return CoachResponse(user_id=user.id, user_name=display_name, advice=advice_text)
 
 
@@ -433,55 +440,60 @@ def analyze_photo(
         f"Sinon identifie les aliments, estime les macros, rédige advice pour {display_name}."
     )
 
-    raw = ""
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",  # gpt-4o-mini ne supporte pas Vision de façon fiable
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                # L'API OpenAI attend ce format exact pour le base64
-                                "url": f"data:{mime_type};base64,{image_b64}",
-                                "detail": "low",  # "low" = moins de tokens, assez pour identifier des aliments
+    parsed = None
+    if client is None:
+        logger.info("Mode offline — fallback /analyze-photo user_id=%s", user.id)
+        parsed = get_fallback_photo()
+    else:
+        raw = ""
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",  # gpt-4o-mini ne supporte pas Vision de façon fiable
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    # L'API OpenAI attend ce format exact pour le base64
+                                    "url": f"data:{mime_type};base64,{image_b64}",
+                                    "detail": "low",  # "low" = moins de tokens, assez pour identifier des aliments
+                                },
                             },
-                        },
-                    ],
-                },
-            ],
-            max_tokens=500,
-        )
+                        ],
+                    },
+                ],
+                max_tokens=500,
+            )
 
-        raw = (response.choices[0].message.content or "").strip()
-        parsed = _parse_photo_gpt_json(raw)
+            raw = (response.choices[0].message.content or "").strip()
+            parsed = _parse_photo_gpt_json(raw)
 
-    except ValueError:
-        logger.info("Photo non reconnue comme repas — user_id=%s : %s", user.id, raw[:120])
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=NOT_A_MEAL_DETAIL,
-        )
-    except json.JSONDecodeError as exc:
-        logger.error("Réponse GPT non parseable : %s", raw, exc_info=True)
-        if raw and _is_gpt_refusal(raw):
+        except ValueError:
+            logger.info("Photo non reconnue comme repas — user_id=%s : %s", user.id, raw[:120])
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=NOT_A_MEAL_DETAIL,
+            )
+        except json.JSONDecodeError as exc:
+            logger.error("Réponse GPT non parseable : %s", raw, exc_info=True)
+            if raw and _is_gpt_refusal(raw):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=NOT_A_MEAL_DETAIL,
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="La réponse IA est invalide. Réessayez dans quelques instants.",
             ) from exc
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="La réponse IA est invalide. Réessayez dans quelques instants.",
-        ) from exc
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("Erreur OpenAI /analyze-photo : %s", exc, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error("Erreur OpenAI /analyze-photo : %s", exc, exc_info=True)
+            parsed = get_fallback_photo()
 
     if not parsed.get("is_meal", True):
         raise HTTPException(
@@ -494,7 +506,7 @@ def analyze_photo(
     advice_text = parsed.get("advice", "")
     macros_dict = macros_to_dict(macros_obj)
 
-    row = persist_ai_request(
+    row = _persist_coach_request(
         db,
         **build_photo_record(
             user.id,
@@ -506,7 +518,8 @@ def analyze_photo(
             len(image_bytes),
         ),
     )
-    attach_meal_photo(db, row, user.id, image_bytes, mime_type)
+    if row is not None:
+        attach_meal_photo(db, row, user.id, image_bytes, mime_type)
 
     return PhotoResponse(
         user_id=user.id,
@@ -556,7 +569,7 @@ def get_workout_plan(
     cached = workout_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/workout-plan user_id=%s", user.id)
-        persist_ai_request(
+        _persist_coach_request(
             db,
             **build_workout_record(
                 user.id,
@@ -611,7 +624,7 @@ def get_workout_plan(
         logger.error("Erreur OpenAI /workout-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_WORKOUT
 
-    persist_ai_request(
+    _persist_coach_request(
         db,
         **build_workout_record(
             user.id,
@@ -667,7 +680,7 @@ def get_meal_plan(
     cached = meal_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/meal-plan user_id=%s", user.id)
-        persist_ai_request(
+        _persist_coach_request(
             db,
             **build_meal_plan_record(
                 user.id,
@@ -712,7 +725,7 @@ def get_meal_plan(
         logger.error("Erreur OpenAI /meal-plan : %s", exc, exc_info=True)
         plan_text = FALLBACK_MEAL
 
-    persist_ai_request(
+    _persist_coach_request(
         db,
         **build_meal_plan_record(
             user.id,
@@ -774,7 +787,7 @@ def get_biometric_trend(
     cached = trend_cache.get(cache_key)
     if cached:
         logger.info("Cache hit — /coach/biometric-trend user_id=%s", user.id)
-        persist_ai_request(
+        _persist_coach_request(
             db,
             **build_trend_record(
                 user.id,
@@ -822,7 +835,7 @@ def get_biometric_trend(
         logger.error("Erreur OpenAI /biometric-trend : %s", exc, exc_info=True)
         analysis_text = FALLBACK_TREND
 
-    persist_ai_request(
+    _persist_coach_request(
         db,
         **build_trend_record(
             user.id,

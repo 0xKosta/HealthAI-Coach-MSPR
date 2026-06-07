@@ -23,3 +23,8 @@ else:
     from openai import OpenAI
 
     client = OpenAI(api_key=_api_key)
+
+
+def should_persist_ai_history() -> bool:
+    """Historique IA : enregistrer uniquement les vraies réponses (pas en mode démo offline)."""
+    return not MOCK_MODE

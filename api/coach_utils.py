@@ -166,6 +166,19 @@ FALLBACK_MEAL = (
 )
 
 
+def get_fallback_photo() -> dict:
+    """Réponse de secours pour /coach/analyze-photo (mode offline ou OpenAI indisponible)."""
+    return {
+        "is_meal": True,
+        "foods_detected": [],
+        "macros": {"calories": 0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0},
+        "advice": (
+            "L'analyse photo par IA est temporairement indisponible. "
+            "En mode démo hors ligne, la reconnaissance visuelle des repas n'est pas active."
+        ),
+    }
+
+
 # =============================================================================
 # VALIDATION IMAGE (analyze-photo)
 # =============================================================================

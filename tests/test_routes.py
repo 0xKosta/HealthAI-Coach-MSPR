@@ -414,3 +414,29 @@ def test_coach_analyze_photo_success(client, created_user, premium_auth_headers)
     data = response.json()
     assert data["foods_detected"] == ["salade"]
     assert data["macros"]["calories"] == 120
+
+
+def test_coach_analyze_photo_offline_fallback(client, created_user, premium_auth_headers):
+    from api.models import AiRequest
+
+    with patch("api.ai_client.MOCK_MODE", True):
+        with patch("api.routers.coach.client", None):
+            response = client.post("/coach/analyze-photo", json={
+                "user_id": created_user["id"],
+                "image_base64": VALID_PNG_B64,
+            }, headers=premium_auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["foods_detected"] == []
+    assert "indisponible" in data["advice"].lower()
+
+    from tests.conftest import TestingSessionLocal
+    db = TestingSessionLocal()
+    try:
+        count = db.query(AiRequest).filter(
+            AiRequest.user_id == created_user["id"],
+            AiRequest.request_type == "analyze_photo",
+        ).count()
+        assert count == 0
+    finally:
+        db.close()
