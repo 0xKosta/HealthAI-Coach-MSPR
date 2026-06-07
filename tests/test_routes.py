@@ -418,6 +418,16 @@ def test_coach_analyze_photo_success(client, created_user, premium_auth_headers)
 
 def test_coach_analyze_photo_offline_fallback(client, created_user, premium_auth_headers):
     from api.models import AiRequest
+    from tests.conftest import TestingSessionLocal
+
+    db = TestingSessionLocal()
+    try:
+        before = db.query(AiRequest).filter(
+            AiRequest.user_id == created_user["id"],
+            AiRequest.request_type == "analyze_photo",
+        ).count()
+    finally:
+        db.close()
 
     with patch("api.ai_client.MOCK_MODE", True):
         with patch("api.routers.coach.client", None):
@@ -430,13 +440,12 @@ def test_coach_analyze_photo_offline_fallback(client, created_user, premium_auth
     assert data["foods_detected"] == []
     assert "indisponible" in data["advice"].lower()
 
-    from tests.conftest import TestingSessionLocal
     db = TestingSessionLocal()
     try:
-        count = db.query(AiRequest).filter(
+        after = db.query(AiRequest).filter(
             AiRequest.user_id == created_user["id"],
             AiRequest.request_type == "analyze_photo",
         ).count()
-        assert count == 0
+        assert after == before
     finally:
         db.close()
